@@ -1,0 +1,9 @@
+# requirements.txt
+# Dépendances pour le dépôt parametric-primes-2026
+# Auteur : Hassane BAKKAOUI (2026)
+# Installation : pip install -r requirements.txt
+
+numpy>=1.24
+scipy>=1.10
+sympy>=1.12
+matplotlib>=3.7
