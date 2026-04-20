@@ -1,0 +1,12 @@
+Premier de 50 chiffres
+Méthode  : Famille p=3m(m+1)+1
+Temps    : 0.02s
+
+a=49, b=20
+Témoins Pocklington : q=2→w=5, q=3→w=5
+
+m =
+1962885116133107262554111
+
+p =
+11558753937410645955046970277760551520567396663297
