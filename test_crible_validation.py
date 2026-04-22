@@ -177,13 +177,28 @@ def b_streaming(a, digits, tol):
             if abs(2*(a*_LOG10_2 + b*_LOG10_3) + _LOG10_3 - digits) <= tol + 2]
 
 a_max    = int(DIGITS_CIBLE / (2 * _LOG10_2)) + 50
-n_crible = 0
-n_mr     = 0
-trouve   = None
-t_debut  = time.perf_counter()
+n_crible   = 0
+n_mr       = 0
+n_paires   = 0
+trouve     = None
+t_debut    = time.perf_counter()
+t_rapport  = t_debut
+RAPPORT_S  = 60   # affiche un rapport toutes les 60 secondes
 
 for a in range(1, a_max):
     for b in b_streaming(a, DIGITS_CIBLE, TOLERANCE):
+        n_paires += 1
+
+        # ── Rapport de progression toutes les 60 secondes ────────────────
+        maintenant = time.perf_counter()
+        if maintenant - t_rapport >= RAPPORT_S:
+            elapsed = maintenant - t_debut
+            cadence = n_paires / elapsed if elapsed > 0 else 0
+            print(f"  [+{elapsed:6.0f}s]  a={a:6d}  paires={n_paires:8,}"
+                  f"  crible={n_crible:7,}  MR={n_mr:5,}"
+                  f"  cadence={cadence:.0f}/s",
+                  flush=True)
+            t_rapport = maintenant
 
         # ── Crible modulaire (µs) ────────────────────────────────────────
         if not crible_modulaire(a, b):
@@ -192,11 +207,14 @@ for a in range(1, a_max):
 
         # ── Miller-Rabin (calcul de p requis ici) ────────────────────────
         n_mr += 1
+        elapsed = time.perf_counter() - t_debut
+        print(f"  [+{elapsed:.1f}s]  MR #{n_mr}  a={a}, b={b} …", flush=True)
         m = deux**a * trois**b - 1
         p = 3 * m * (m + 1) + 1
         nb = int(gmpy2.num_digits(p))
 
         if not gmpy2.is_prime(p, MR_TOURS):
+            print(f"  → composé", flush=True)
             continue
 
         # ── Candidat probable ────────────────────────────────────────────
