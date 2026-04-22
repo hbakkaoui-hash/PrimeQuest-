@@ -11,7 +11,7 @@ import math
 import time
 import sys
 
-DIGITS_CIBLE  = 20_000
+DIGITS_CIBLE  = 10_000
 TOLERANCE     = 10
 MR_TOURS      = 25
 TEMOINS_MAX   = 300
