@@ -1,16 +1,18 @@
 #!/usr/bin/env python3
 """
-PrimeQuest — Recherche et preuve de primalité AVEC REPRISE
+PrimeQuest v2 — Recherche et preuve de primalité AVEC REPRISE
 Famille : p = 3m(m+1)+1,  m = 2^a · 3^b − 1
 Preuve  : Théorème de Pocklington N-1
 
-Fonctionnalité clé : checkpoint automatique
-  - Sauvegarde la position toutes les N secondes
-  - Reprend exactement là où le script s'était arrêté
-  - Fichier checkpoint : primequest_checkpoint.json
+Optimisations intégrées (issues de l'analyse arithmétique) :
+  1. Crible modulaire restreint aux premiers q ≡ 1 (mod 3)
+     Théorème prouvé : q | p impossible si q ≡ 2 (mod 3)
+     → ~50% des premiers du crible supprimés, taux élimination identique
+  2. Zigzag depuis a_centre = (D/2)/log10(6) — zone la plus fertile
+  3. Checkpoint automatique — reprise exacte après interruption
 
 Usage : python3 primequest_final.py
-        Modifier DIGITS_CIBLE et TIMEOUT_S ci-dessous.
+        Modifier DIGITS_CIBLE, TIMEOUT_S et DELTA_DEPART ci-dessous.
 
 Dépendance : pip install gmpy2
 """
@@ -32,18 +34,17 @@ TOLERANCE       = 10          # tolérance ±chiffres
 MR_TOURS        = 25          # tours Miller-Rabin
 TEMOINS_MAX     = 300         # max témoins Pocklington
 SIEVE_LIMIT     = 1_000_000   # crible jusqu'à ce nombre
-RAPPORT_S       = 300         # rapport progression (secondes)
-CHECKPOINT_S    = 60          # sauvegarde checkpoint (secondes)
+RAPPORT_S       = 300         # rapport toutes les 5 min
+CHECKPOINT_S    = 60          # sauvegarde checkpoint toutes les 60s
 CHECKPOINT_FILE = f"checkpoint_{DIGITS_CIBLE}.json"
 
 # ───────────────────────────────────────────────────────────────
-# DÉPART MANUEL — ignorer le checkpoint et forcer un delta
+# DÉPART MANUEL — utile si le checkpoint n'existe pas
 # ───────────────────────────────────────────────────────────────
-# Si DELTA_DEPART > 0 : démarre à a_centre + DELTA_DEPART
-# (utile après une session interrompue sans checkpoint)
-# Mettre 0 pour comportement normal (checkpoint ou début)
-DELTA_DEPART    = 350         # ← CHANGER ICI  (0 = automatique)
-TEMPS_CUMUL_H   = 3.0         # ← heures déjà passées (pour le compteur total)
+# DELTA_DEPART > 0 : démarre à a_centre + DELTA_DEPART (ignore checkpoint)
+# DELTA_DEPART = 0 : comportement automatique (checkpoint ou début)
+DELTA_DEPART    = 0           # ← CHANGER ICI
+TEMPS_CUMUL_H   = 0.0         # ← heures déjà passées (sessions précédentes)
 # ═══════════════════════════════════════════════════════════════
 
 deux    = gmpy2.mpz(2)
@@ -52,28 +53,37 @@ LOG10_2 = math.log10(2)
 LOG10_3 = math.log10(3)
 
 
-# ── Crible d'Ératosthène ─────────────────────────────────────────────────────
+# ── Crible d'Ératosthène — uniquement q ≡ 1 (mod 3) ────────────────────────
+#
+# Théorème (prouvé) : q | p est impossible si q ≡ 2 (mod 3).
+# Preuve : 3x²-3x+1 ≡ 0 (mod q) a des solutions ssi Δ=-3 est un carré mod q,
+#          ssi (-3/q)=1, ssi q ≡ 1 (mod 3).
+# Conséquence : on ne conserve que les q ≡ 1 (mod 3), soit ~50% du crible.
 
-def _eratosthene(lim):
+def _eratosthene_filtre(lim):
+    """Crible d'Ératosthène — retourne uniquement les premiers q ≡ 1 (mod 3)."""
     t = bytearray([1]) * (lim + 1)
     t[0] = t[1] = 0
     for i in range(2, int(lim**0.5) + 1):
         if t[i]:
             t[i*i::i] = bytearray(len(t[i*i::i]))
-    return [i for i in range(2, lim + 1) if t[i]]
+    return [i for i in range(5, lim + 1) if t[i] and i % 3 == 1]
 
-print(f"Construction du crible jusqu'à {SIEVE_LIMIT:,}…", end=" ", flush=True)
+print(f"Construction du crible (q ≡ 1 mod 3) jusqu'à {SIEVE_LIMIT:,}…",
+      end=" ", flush=True)
 t0 = time.perf_counter()
-PREMIERS = _eratosthene(SIEVE_LIMIT)
-print(f"{len(PREMIERS):,} premiers  ({time.perf_counter()-t0:.2f}s)")
+PREMIERS = _eratosthene_filtre(SIEVE_LIMIT)
+print(f"{len(PREMIERS):,} premiers utiles  ({time.perf_counter()-t0:.2f}s)")
 
 
 # ── Crible modulaire (sans calculer p) ───────────────────────────────────────
+#
+# Pour q ≡ 1 (mod 3) : teste si q | p en O(1) sans calculer p.
+# x = 2^a · 3^b mod q  (via petit théorème de Fermat)
+# p mod q = (3(x-1)x + 1) mod q
 
 def crible_modulaire(a, b):
     for q in PREMIERS:
-        if q <= 3:
-            continue
         x     = (pow(2, a % (q - 1), q) * pow(3, b % (q - 1), q)) % q
         p_mod = (3 * (x - 1) * x + 1) % q
         if p_mod == 0:
@@ -111,14 +121,11 @@ def pocklington(p, a, b):
     return False, v
 
 
-# ── Zigzag explicite (reprennable) ───────────────────────────────────────────
+# ── Zigzag depuis le centre (reprennable) ────────────────────────────────────
 #
+# Centre optimal : a_centre = (D/2) / log10(6)
 # Séquence : centre, centre+1, centre-1, centre+2, centre-2, …
-# Position représentée par (delta, side) :
-#   delta=0, side=0 → centre
-#   delta=1, side=0 → centre+1   delta=1, side=1 → centre-1
-#   delta=2, side=0 → centre+2   delta=2, side=1 → centre-2
-# Le checkpoint sauvegarde (delta, side) pour reprendre exactement.
+# Position encodée par (delta, side) pour reprise exacte via checkpoint.
 
 def a_depuis_position(centre, delta, side):
     if delta == 0:
@@ -126,9 +133,7 @@ def a_depuis_position(centre, delta, side):
     return centre + delta if side == 0 else centre - delta
 
 def position_suivante(delta, side, centre, a_min, a_max):
-    """Retourne le (delta, side) suivant dans le zigzag."""
     if delta == 0:
-        # Passer à delta=1, side=0 (centre+1)
         if centre + 1 <= a_max:
             return 1, 0
         elif centre - 1 >= a_min:
@@ -136,21 +141,18 @@ def position_suivante(delta, side, centre, a_min, a_max):
         else:
             return None, None
     if side == 0:
-        # Vient de faire centre+delta → faire centre-delta
         if centre - delta >= a_min:
             return delta, 1
         else:
-            # Sauter directement au delta suivant, side=0
             return position_suivante(delta + 1, -1, centre, a_min, a_max)
     else:
-        # Vient de faire centre-delta → passer à delta+1
         nd = delta + 1
         if centre + nd <= a_max:
             return nd, 0
         elif centre - nd >= a_min:
             return nd, 1
         else:
-            return None, None  # fin de l'espace
+            return None, None
 
 
 # ── Checkpoint ────────────────────────────────────────────────────────────────
@@ -163,7 +165,7 @@ def sauver_checkpoint(delta, side, n_crible, n_mr, n_paires, t_cumul):
         "n_crible": n_crible,
         "n_mr":     n_mr,
         "n_paires": n_paires,
-        "t_cumul":  t_cumul,      # temps total accumulé (toutes sessions)
+        "t_cumul":  t_cumul,
     }
     with open(CHECKPOINT_FILE, "w") as f:
         json.dump(data, f, indent=2)
@@ -187,13 +189,12 @@ def supprimer_checkpoint():
         os.remove(CHECKPOINT_FILE)
 
 
-# ── Gestionnaire de signal (Ctrl+C) ──────────────────────────────────────────
-# Permet une sauvegarde propre avant de quitter
+# ── Gestionnaire de signal (Ctrl+C / SIGTERM) ────────────────────────────────
 
 _etat_global = {}
 
 def handler_signal(sig, frame):
-    print(f"\n  ⚡ Interruption reçue — sauvegarde du checkpoint…", flush=True)
+    print(f"\n  ⚡ Interruption — sauvegarde du checkpoint…", flush=True)
     if _etat_global:
         sauver_checkpoint(
             _etat_global["delta"],
@@ -216,18 +217,15 @@ signal.signal(signal.SIGTERM, handler_signal)
 a_centre = int((DIGITS_CIBLE / 2) / math.log10(6))
 a_max    = int(DIGITS_CIBLE / (2 * LOG10_2)) + 10
 
-# Chargement checkpoint ou départ manuel
 if DELTA_DEPART > 0:
-    # Départ forcé — ignore le checkpoint
     delta    = DELTA_DEPART
     side     = 0
     n_crible = 0
     n_mr     = 0
     n_paires = 0
     t_cumul  = TEMPS_CUMUL_H * 3600
-    a_depart = a_centre + delta
-    print(f"\n  ▶  DÉPART MANUEL : delta={delta} → a={a_depart}")
-    print(f"     Temps cumulé pris en compte : {TEMPS_CUMUL_H}h")
+    print(f"\n  ▶  DÉPART MANUEL : delta={delta} → a={a_centre + delta}")
+    print(f"     Temps cumulé : {TEMPS_CUMUL_H}h")
 else:
     cp = charger_checkpoint()
     if cp:
@@ -238,9 +236,9 @@ else:
         n_paires = cp["n_paires"]
         t_cumul  = cp["t_cumul"]
         print(f"\n  ♻  REPRISE depuis le checkpoint :")
-        print(f"     delta={delta}, side={side}")
-        print(f"     Temps déjà passé  : {t_cumul/3600:.2f}h")
-        print(f"     MR déjà effectués : {n_mr}")
+        print(f"     delta={delta}, side={side}  →  a={a_depuis_position(a_centre, delta, side)}")
+        print(f"     Temps cumulé  : {t_cumul/3600:.2f}h")
+        print(f"     MR effectués  : {n_mr}")
     else:
         delta    = 0
         side     = 0
@@ -251,12 +249,13 @@ else:
         print(f"\n  Nouvelle recherche (aucun checkpoint)")
 
 print(f"\n{'═'*65}")
-print(f"  PrimeQuest — p = 3m(m+1)+1,  m = 2^a·3^b−1")
+print(f"  PrimeQuest v2 — p = 3m(m+1)+1,  m = 2^a·3^b−1")
 print(f"{'═'*65}")
-print(f"  Cible       : {DIGITS_CIBLE:,} chiffres (±{TOLERANCE})")
-print(f"  a_centre    : {a_centre:,}   a_max : {a_max:,}")
-print(f"  Timeout     : {TIMEOUT_S:,}s ({TIMEOUT_S/3600:.1f}h) par session")
-print(f"  Checkpoint  : toutes les {CHECKPOINT_S}s → {CHECKPOINT_FILE}")
+print(f"  Cible         : {DIGITS_CIBLE:,} chiffres (±{TOLERANCE})")
+print(f"  a_centre      : {a_centre:,}   a_max : {a_max:,}")
+print(f"  Crible        : {len(PREMIERS):,} premiers q ≡ 1(mod3) ≤ {SIEVE_LIMIT:,}")
+print(f"  Timeout       : {TIMEOUT_S:,}s ({TIMEOUT_S/3600:.1f}h) par session")
+print(f"  Checkpoint    : toutes les {CHECKPOINT_S}s → {CHECKPOINT_FILE}")
 print(f"{'─'*65}\n")
 
 
@@ -267,7 +266,6 @@ t_debut   = time.perf_counter()
 t_rapport = t_debut
 t_ckpt    = t_debut
 
-# Mise à jour état global (pour le handler Ctrl+C)
 _etat_global.update({
     "delta": delta, "side": side,
     "n_crible": n_crible, "n_mr": n_mr, "n_paires": n_paires,
@@ -279,12 +277,10 @@ while delta is not None:
     elapsed_session = time.perf_counter() - t_debut
     elapsed_total   = t_cumul + elapsed_session
 
-    # ── Timeout session ───────────────────────────────────────────────────
     if elapsed_session >= TIMEOUT_S:
-        print(f"\n  ⏱  Timeout session {TIMEOUT_S/3600:.1f}h atteint.")
+        print(f"\n  ⏱  Timeout {TIMEOUT_S/3600:.1f}h atteint.")
         sauver_checkpoint(delta, side, n_crible, n_mr, n_paires, elapsed_total)
-        print(f"  Checkpoint sauvegardé → {CHECKPOINT_FILE}")
-        print(f"  Relancer pour continuer.")
+        print(f"  Checkpoint → {CHECKPOINT_FILE}  (relancer pour continuer)")
         break
 
     a = a_depuis_position(a_centre, delta, side)
@@ -292,17 +288,17 @@ while delta is not None:
     for b in b_valides(a, DIGITS_CIBLE, TOLERANCE):
         n_paires += 1
 
-        # ── Checkpoint périodique ─────────────────────────────────────────
         now = time.perf_counter()
+
+        # ── Checkpoint périodique ─────────────────────────────────────────
         if now - t_ckpt >= CHECKPOINT_S:
-            elapsed_total = t_cumul + (now - t_debut)
-            sauver_checkpoint(delta, side, n_crible, n_mr, n_paires, elapsed_total)
+            sauver_checkpoint(delta, side, n_crible, n_mr, n_paires,
+                              t_cumul + (now - t_debut))
             t_ckpt = now
             _etat_global.update({
                 "delta": delta, "side": side,
                 "n_crible": n_crible, "n_mr": n_mr,
-                "n_paires": n_paires,
-                "t_cumul": t_cumul, "t_debut": t_debut
+                "n_paires": n_paires, "t_cumul": t_cumul, "t_debut": t_debut
             })
 
         # ── Rapport de progression ────────────────────────────────────────
@@ -312,15 +308,15 @@ while delta is not None:
             restant     = max(0, TIMEOUT_S - elapsed_s)
             taux        = elapsed_s / max(n_mr, 1)
             print(
-                f"  [{elapsed_tot/3600:5.2f}h total]  a={a:7,}  "
+                f"  [{elapsed_tot/3600:5.2f}h]  a={a:7,}  "
                 f"paires={n_paires:9,}  crible={n_crible:8,}  "
-                f"MR={n_mr:5,}  ~{taux:.0f}s/MR  "
-                f"session restant={restant/60:.0f}min",
+                f"MR={n_mr:4,}  ~{taux:.0f}s/MR  "
+                f"restant={restant/60:.0f}min",
                 flush=True
             )
             t_rapport = now
 
-        # ── Crible modulaire (µs) ─────────────────────────────────────────
+        # ── Crible modulaire — q ≡ 1 (mod 3) uniquement ──────────────────
         if not crible_modulaire(a, b):
             n_crible += 1
             continue
@@ -356,7 +352,6 @@ while delta is not None:
     if trouve:
         break
 
-    # Avancer dans le zigzag
     delta, side = position_suivante(delta, side, a_centre, 1, a_max)
     _etat_global["delta"] = delta
     _etat_global["side"]  = side
@@ -402,7 +397,7 @@ if trouve:
 
     nom = f"premier_{nb}chiffres.txt"
     with open(nom, "w") as f:
-        f.write(f"Premier de {nb} chiffres — PrimeQuest zigzag\n")
+        f.write(f"Premier de {nb} chiffres — PrimeQuest v2\n")
         f.write(f"a={a}, b={b}\n")
         f.write(f"Témoins : q=2→w={temoins[2]}, q=3→w={temoins[3]}\n")
         f.write(f"Temps   : {t_total:.1f}s\n\nm =\n{m}\n\np =\n{p}\n")
@@ -414,17 +409,16 @@ elif delta is None:
     print("  Augmenter TOLERANCE.")
 
 else:
-    # Timeout — checkpoint déjà sauvegardé dans la boucle
     tps_par_mr = t_session / max(n_mr, 1)
     print(f"  COMPTE RENDU — Session terminée")
     print(f"{'═'*65}")
     print(f"""
   Temps session           : {t_session/3600:.2f}h
   Temps total cumulé      : {t_total/3600:.2f}h
-  a exploré (ce delta)    : a_centre={a_centre} ± {delta}
-  Paires testées (total)  : {n_paires:,}
-  Éliminées crible (total): {n_crible:,}  ({n_crible/max(n_paires,1)*100:.1f}%)
-  Tests MR (total)        : {n_mr}
+  a exploré               : a_centre={a_centre} ± {delta}
+  Paires testées          : {n_paires:,}
+  Éliminées (crible)      : {n_crible:,}  ({n_crible/max(n_paires,1)*100:.1f}%)
+  Tests MR                : {n_mr}
   Temps par MR            : {tps_par_mr:.1f}s
   Résultat                : aucun premier — relancer pour continuer
 

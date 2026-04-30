@@ -1,0 +1,29 @@
+Premier de 19 999 chiffres — PrimeQuest
+========================================
+
+a = 12228
+b = 13242
+p = 3·m·(m+1)+1   (19 999 chiffres)
+m = 2^12228 · 3^13242 − 1
+
+Certificat Pocklington
+──────────────────────
+F = 2^12228 · 3^13243   (facteur connu de p−1, F > √p  ✅)
+q=2  →  témoin w = 5    ✅
+q=3  →  témoin w = 7    ✅
+
+Temps de calcul : 22 581.9 s  (6 h 16 min)
+
+Note sur le protocole de recherche
+────────────────────────────────────
+La recherche du candidat a débuté avec PrimeQuest v1 (crible complet,
+78 498 premiers q ≤ 10^6), puis a été reprise avec PrimeQuest v2
+(crible restreint aux q ≡ 1 mod 3, soit 39 231 premiers — Théorème 3).
+
+La validité du résultat n'est pas affectée par ce changement de version :
+le certificat de Pocklington est une preuve déterministe et vérifiable
+indépendante du chemin de recherche. Seule la recherche du candidat est
+heuristique ; la preuve de primalité est rigoureuse et complète.
+
+Remarque : avec PrimeQuest v2 seul dès le départ, le même candidat
+aurait été atteint en un temps inférieur (~50% pour la phase de crible).

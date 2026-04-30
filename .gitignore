@@ -1,5 +1,6 @@
+# Python
 __pycache__/
-*.py[cod]
+*.pyc
 *.pyo
 *.pyd
 .Python
@@ -7,4 +8,26 @@ __pycache__/
 dist/
 build/
 .env
+venv/
 .venv/
+
+# PrimeQuest — fichiers générés à l'exécution
+checkpoint_*.json
+premier_*chiffres.txt
+famille_1000_premiers.csv
+analyse_famille_1000.png
+
+# LaTeX
+*.aux
+*.log
+*.out
+*.toc
+*.fls
+*.fdb_latexmk
+*.synctex.gz
+*.bbl
+*.blg
+
+# OS
+.DS_Store
+Thumbs.db
