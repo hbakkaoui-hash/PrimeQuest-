@@ -35,6 +35,15 @@ SIEVE_LIMIT     = 1_000_000   # crible jusqu'à ce nombre
 RAPPORT_S       = 300         # rapport progression (secondes)
 CHECKPOINT_S    = 60          # sauvegarde checkpoint (secondes)
 CHECKPOINT_FILE = f"checkpoint_{DIGITS_CIBLE}.json"
+
+# ───────────────────────────────────────────────────────────────
+# DÉPART MANUEL — ignorer le checkpoint et forcer un delta
+# ───────────────────────────────────────────────────────────────
+# Si DELTA_DEPART > 0 : démarre à a_centre + DELTA_DEPART
+# (utile après une session interrompue sans checkpoint)
+# Mettre 0 pour comportement normal (checkpoint ou début)
+DELTA_DEPART    = 350         # ← CHANGER ICI  (0 = automatique)
+TEMPS_CUMUL_H   = 3.0         # ← heures déjà passées (pour le compteur total)
 # ═══════════════════════════════════════════════════════════════
 
 deux    = gmpy2.mpz(2)
@@ -207,27 +216,39 @@ signal.signal(signal.SIGTERM, handler_signal)
 a_centre = int((DIGITS_CIBLE / 2) / math.log10(6))
 a_max    = int(DIGITS_CIBLE / (2 * LOG10_2)) + 10
 
-# Chargement checkpoint
-cp = charger_checkpoint()
-if cp:
-    delta    = cp["delta"]
-    side     = cp["side"]
-    n_crible = cp["n_crible"]
-    n_mr     = cp["n_mr"]
-    n_paires = cp["n_paires"]
-    t_cumul  = cp["t_cumul"]
-    print(f"\n  ♻  REPRISE depuis le checkpoint :")
-    print(f"     delta={delta}, side={side}")
-    print(f"     Temps déjà passé  : {t_cumul/3600:.2f}h")
-    print(f"     MR déjà effectués : {n_mr}")
-else:
-    delta    = 0
+# Chargement checkpoint ou départ manuel
+if DELTA_DEPART > 0:
+    # Départ forcé — ignore le checkpoint
+    delta    = DELTA_DEPART
     side     = 0
     n_crible = 0
     n_mr     = 0
     n_paires = 0
-    t_cumul  = 0.0
-    print(f"\n  🆕 Nouvelle recherche (aucun checkpoint)")
+    t_cumul  = TEMPS_CUMUL_H * 3600
+    a_depart = a_centre + delta
+    print(f"\n  ▶  DÉPART MANUEL : delta={delta} → a={a_depart}")
+    print(f"     Temps cumulé pris en compte : {TEMPS_CUMUL_H}h")
+else:
+    cp = charger_checkpoint()
+    if cp:
+        delta    = cp["delta"]
+        side     = cp["side"]
+        n_crible = cp["n_crible"]
+        n_mr     = cp["n_mr"]
+        n_paires = cp["n_paires"]
+        t_cumul  = cp["t_cumul"]
+        print(f"\n  ♻  REPRISE depuis le checkpoint :")
+        print(f"     delta={delta}, side={side}")
+        print(f"     Temps déjà passé  : {t_cumul/3600:.2f}h")
+        print(f"     MR déjà effectués : {n_mr}")
+    else:
+        delta    = 0
+        side     = 0
+        n_crible = 0
+        n_mr     = 0
+        n_paires = 0
+        t_cumul  = 0.0
+        print(f"\n  Nouvelle recherche (aucun checkpoint)")
 
 print(f"\n{'═'*65}")
 print(f"  PrimeQuest — p = 3m(m+1)+1,  m = 2^a·3^b−1")
