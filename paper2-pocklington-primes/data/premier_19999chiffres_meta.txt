@@ -14,19 +14,11 @@ q=3  →  témoin w = 7    ✅
 
 p = 3515646568908327317971961013194053743079…31744562930003214337
 
-Performance (résultat officiel)
-────────────────────────────────
-Script          : PrimeQuest v3 (multi-cœurs, primequest_v3.py)
-Machine         : Dell Inspiron 14 Plus 7441 — Snapdragon X Plus (ARM64)
-Workers         : 9 (sur 10 cœurs Oryon)
-Temps session   : 9 567.1 s  (2 h 40 min)
-Tests MR        : 1 050
-Éliminés crible : 7 661  (87.9%)
-
-Optimisations actives
-──────────────────────
-1. Crible restreint q≡1(mod3) — Théorème 3 prouvé (~50% de primes en moins)
-2. Parallélisation multiprocessing — 9 workers simultanés
-3. Zigzag depuis a_centre optimal
-
-Gain vs v1 séquentiel : 22 581 s → 9 567 s  (×2.36)
+Performance
+────────────
+Script   : PrimeQuest v3 (primequest_v3.py)
+Machine  : Dell Inspiron 14 Plus 7441 — Snapdragon X Plus (ARM64)
+Workers  : 9 (sur 10 cœurs Oryon)
+Temps    : 9 567.1 s  (2 h 40 min)
+MR tests : 1 050
+Crible   : 7 661 éliminés (87.9%)
