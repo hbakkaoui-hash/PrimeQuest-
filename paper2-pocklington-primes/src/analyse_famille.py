@@ -17,8 +17,8 @@ import os
 # PARAMÈTRES
 # ═══════════════════════════════════════════════════════════════
 N_CIBLES    = 1000     # nombre de premiers à trouver
-A_MAX       = 300      # valeur max de a à explorer
-B_MAX       = 300      # valeur max de b à explorer
+A_MAX       = 600      # valeur max de a à explorer
+B_MAX       = 600      # valeur max de b à explorer
 MR_TOURS    = 20       # tours Miller-Rabin (20 suffisent pour petits nombres)
 FICHIER_CSV = "famille_1000_premiers.csv"
 # ═══════════════════════════════════════════════════════════════
