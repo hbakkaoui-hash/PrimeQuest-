@@ -28,8 +28,8 @@ import signal
 # ═══════════════════════════════════════════════════════════════
 # PARAMÈTRES — modifier ici
 # ═══════════════════════════════════════════════════════════════
-DIGITS_CIBLE    = 15_000      # nombre de chiffres souhaité
-TIMEOUT_S       = 7_200       # durée max par session (7200 = 2h)
+DIGITS_CIBLE    = 20_000      # nombre de chiffres souhaité
+TIMEOUT_S       = 14_400      # durée max par session (14400 = 4h)
 TOLERANCE       = 10          # tolérance ±chiffres
 MR_TOURS        = 25          # tours Miller-Rabin
 TEMOINS_MAX     = 300         # max témoins Pocklington
