@@ -202,7 +202,7 @@ La congruence de $p$ modulo 7 s'exprime en fonction de $x$ seul.
   soit exactement $\mathcal{F}_7$.
 \end{proof}
 
-\begin{corollaire}[Efficacité du crible modulaire]
+\begin{corollaire}[Efficacité du crible modulaire pour $q=7$]
   Sur l'ensemble de toutes les paires $(a \bmod 3, b \bmod 6)$,
   la proportion de candidats éliminés par divisibilité par $7$ est
   \[
@@ -211,13 +211,82 @@ La congruence de $p$ modulo 7 s'exprime en fonction de $x$ seul.
   Le seul premier $q = 7$ élimine exactement un tiers des candidats $(a,b)$.
 \end{corollaire}
 
-\begin{remarque}
-  Ce résultat justifie théoriquement l'efficacité du crible modulaire
-  implémenté dans l'algorithme PrimeQuest :
-  chaque petit premier $q$ élimine une fraction calculable des paires $(a,b)$
-  par des opérations modulaires de coût $O(1)$,
-  sans jamais calculer $p$ en grande précision.
-\end{remarque}
+% ═══════════════════════════════════════════════════════════════
+\subsection{Généralisation : critère de divisibilité pour tout premier $q$}
+% ═══════════════════════════════════════════════════════════════
+
+\begin{theoreme}[Critère de divisibilité — cas général]\label{thm:qmod3}
+  Soit $q > 3$ un nombre premier.
+  Il existe des paires $(a,b) \in \N^2$ telles que $q \mid p$
+  \textbf{si et seulement si} $q \equiv 1 \pmod{3}$.
+
+  En d'autres termes :
+  \begin{itemize}
+    \item Si $q \equiv 2 \pmod{3}$, alors $q \nmid p$ pour toute paire $(a,b)$.
+    \item Si $q \equiv 1 \pmod{3}$, il existe des classes $(a \bmod \ord_q(2),\;
+          b \bmod \ord_q(3))$ pour lesquelles $q \mid p$.
+  \end{itemize}
+\end{theoreme}
+
+\begin{proof}
+  La condition $q \mid p$ équivaut à
+  $3x^2 - 3x + 1 \equiv 0 \pmod{q}$, où $x = 2^a \cdot 3^b \bmod q$.
+  Cette équation du second degré admet des solutions modulo $q$
+  si et seulement si son discriminant $\Delta = 9 - 12 = -3$
+  est un carré modulo $q$, c'est-à-dire si le symbole de Legendre
+  $\left(\frac{-3}{q}\right) = 1$.
+
+  Or, par la théorie des caractères quadratiques,
+  $\left(\frac{-3}{q}\right) = 1$ si et seulement si $q \equiv 1 \pmod{3}$.
+  (Cela découle de la loi de réciprocité quadratique et du fait que
+  $-3$ est le discriminant du corps cyclotomique $\Q(\zeta_3)$.)
+\end{proof}
+
+\begin{corollaire}[Inutilité de la moitié des premiers]
+  Par le théorème de Dirichlet, les premiers se répartissent
+  de façon équiprobable entre les classes $1$ et $2$ modulo $3$.
+  Ainsi, environ la moitié des premiers $q > 3$ sont inutiles
+  pour le crible : ils ne peuvent jamais éliminer un candidat $(a,b)$.
+
+  Une implémentation optimale du crible ne teste que les premiers
+  $q \equiv 1 \pmod{3}$.
+\end{corollaire}
+
+\begin{center}
+\renewcommand{\arraystretch}{1.2}
+\begin{tabular}{rrrrrrr}
+  \toprule
+  $q$ & $q \bmod 3$ & $\ord_q(2)$ & $\ord_q(3)$
+      & $|\mathcal{F}_q|$ & Total & Fraction éliminée \\
+  \midrule
+   5  & 2 & 4 & 4 & 0  & 16   & $0\%$ \\
+   7  & 1 & 3 & 6 & 6  & 18   & $33{,}3\%$ \\
+  11  & 2 & 10 & 5 & 0 & 50   & $0\%$ \\
+  13  & 1 & 12 & 3 & 6 & 36   & $16{,}7\%$ \\
+  17  & 2 & 8 & 16 & 0 & 128  & $0\%$ \\
+  19  & 1 & 18 & 18 & 36 & 324 & $11{,}1\%$ \\
+  23  & 2 & 11 & 11 & 0 & 121 & $0\%$ \\
+  31  & 1 & 5 & 30 & 10 & 150 & $6{,}7\%$ \\
+  37  & 1 & 36 & 18 & 36 & 648 & $5{,}6\%$ \\
+  43  & 1 & 14 & 42 & 28 & 588 & $4{,}8\%$ \\
+  61  & 1 & 60 & 20 & 20 & 600 & $3{,}3\%$ \\
+  67  & 1 & 66 & 22 & 44 & 1452 & $3{,}0\%$ \\
+  \bottomrule
+\end{tabular}
+\end{center}
+
+\begin{proposition}[Fraction cumulée éliminée]
+  En notant $f_q$ la fraction de candidats éliminés par le premier $q$,
+  la fraction cumulée éliminée par tous les premiers $q \leq N$ est,
+  sous hypothèse d'indépendance :
+  \[
+    1 - \prod_{\substack{q \leq N \\ q \equiv 1\, (\text{mod}\, 3)}}
+    (1 - f_q).
+  \]
+  Pour $N = 200$, cette fraction atteint $\approx 67\%$.
+  Pour $N = 10^6$ (valeur utilisée dans PrimeQuest),
+  le taux d'élimination empirique observé est de \textbf{97--98\%}.
+\end{proposition}
 
 % ═══════════════════════════════════════════════════════════════
 \section{Analyse empirique des 1 000 premiers de la famille}
@@ -419,19 +488,46 @@ Il suffit donc de trouver des témoins pour $q = 2$ et $q = 3$ uniquement.
     est la plus fertile, justifiant la stratégie de zigzag.
 \end{enumerate}
 
+\subsection{Densité des premiers dans la famille}
+
+Sur les 1~000 premiers trouvés avec $a, b \leq 600$,
+le nombre de paires $(a,b)$ explorées est de l'ordre de $600^2/2 \approx 180\,000$.
+Le ratio \emph{premiers trouvés / paires explorées} est donc
+$1000 / 180\,000 \approx 0{,}56\%$.
+
+Empiriquement, le nombre de premiers $p$ de la famille
+avec $a + b \leq N$ semble croître comme $c \cdot N^2 / \log N$,
+conformément à la conjecture de Cramér généralisée.
+La constante $c$ dépend de la densité du crible :
+\[
+  c = \prod_{\substack{q \text{ premier} \\ q \equiv 1\,(\text{mod}\,3)}}
+  \left(1 - \frac{|\mathcal{F}_q|}{|\mathcal{C}_q|}\right)
+\]
+où $\mathcal{C}_q = \ord_q(2) \times \ord_q(3)$ est l'espace des classes modulo $q$.
+
 \subsection{Questions ouvertes}
 
-Le Théorème~\ref{thm:mod7} s'étend naturellement à tout premier $q$.
-Pour chaque $q$, on peut calculer l'ensemble des classes interdites
-$\mathcal{F}_q$ et la fraction de candidats éliminés
-$|\mathcal{F}_q| / (\ord_q(2) \cdot \ord_q(3))$.
-La somme de ces fractions quantifie précisément l'efficacité
-théorique du crible modulaire.
+\begin{enumerate}
+  \item \textbf{Optimalité du crible :}
+    Le Théorème~\ref{thm:qmod3} montre que seuls les premiers
+    $q \equiv 1 \pmod{3}$ contribuent au crible.
+    Peut-on quantifier précisément la constante de densité $c$ ci-dessus ?
 
-Une question ouverte est de déterminer si la distribution des premiers
-dans cette famille satisfait une loi de type \emph{Cramér},
-c'est-à-dire si le nombre de premiers avec $a + b \leq N$
-est asymptotiquement $c \cdot N^2 / \log N$ pour une constante $c > 0$.
+  \item \textbf{Loi de distribution des témoins Pocklington :}
+    Sur les 1~000 premiers, quelle est la distribution
+    des témoins $w$ pour $q=2$ et $q=3$ ?
+    Existe-t-il une borne uniforme sur $w$ ?
+
+  \item \textbf{Vers le million de chiffres :}
+    L'algorithme PrimeQuest est-il efficace à cette échelle ?
+    Le zigzag depuis $a_{\text{centre}}$ reste-t-il optimal
+    pour des nombres de $10^6$ chiffres,
+    ou faut-il une stratégie de recherche plus sophistiquée ?
+
+  \item \textbf{Familles généralisées :}
+    Peut-on étendre ces résultats à $m = 2^a \cdot 3^b \cdot 5^c - 1$,
+    obtenant des premiers certifiés avec $p - 1$ encore plus factorisé ?
+\end{enumerate}
 
 % ─────────────────────────────────────────────────────────────
 \end{document}
