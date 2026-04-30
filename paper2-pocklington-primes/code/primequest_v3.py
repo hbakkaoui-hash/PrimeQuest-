@@ -187,7 +187,7 @@ def generer_batch(delta, side, centre, a_min, a_max, digits, tol, taille):
 # ── Checkpoint ────────────────────────────────────────────────────────────────
 
 def sauver_checkpoint(delta, side, n_crible, n_mr, n_paires, t_cumul):
-    with open(CHECKPOINT_FILE, "w") as f:
+    with open(CHECKPOINT_FILE, "w", encoding="utf-8") as f:
         json.dump({
             "digits":   DIGITS_CIBLE,
             "delta":    delta,
@@ -202,7 +202,7 @@ def charger_checkpoint():
     if not os.path.exists(CHECKPOINT_FILE):
         return None
     try:
-        with open(CHECKPOINT_FILE) as f:
+        with open(CHECKPOINT_FILE, encoding="utf-8") as f:
             data = json.load(f)
         if data.get("digits") != DIGITS_CIBLE:
             print(f"  ⚠  Checkpoint ignoré (digits={data.get('digits')} ≠ {DIGITS_CIBLE})")
@@ -432,7 +432,7 @@ if __name__ == '__main__':
   p = {sp[:40]}…{sp[-20:]}
 """)
         nom = f"premier_{nb}chiffres.txt"
-        with open(nom, "w") as f:
+        with open(nom, "w", encoding="utf-8") as f:
             f.write(f"Premier de {nb} chiffres — PrimeQuest v3\n")
             f.write(f"a={a}, b={b}\n")
             f.write(f"Témoins : q=2→w={temoins[2]}, q=3→w={temoins[3]}\n")
