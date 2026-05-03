@@ -47,10 +47,10 @@ CHECKPOINT_FILE = f"checkpoint_{DIGITS_CIBLE}.json"
 # ───────────────────────────────────────────────────────────────
 # CENTRE CORRIGÉ — ratio empirique b/a
 # ───────────────────────────────────────────────────────────────
-# Observé sur 1000 premiers + résultat 19999 ch. (a=12228, b=13242) :
-#   ratio b/a = 13242/12228 ≈ 1.083  (b légèrement > a)
-# v3 supposait ratio=1.0 → centre décalé de ~934 pas pour 30 000 ch.
-RATIO_B_SUR_A   = 1.083       # ← ajuster si nouveaux résultats disponibles
+# Résultat 29998 ch. (a=19435, b=19173) : ratio b/a = 0.9865 ≈ 1.0
+# Résultat 19999 ch. (a=12228, b=13242) : ratio b/a = 1.083
+# → ratio=1.0 donne un centre plus robuste (plus proche en moyenne)
+RATIO_B_SUR_A   = 1.000       # ← ratio b/a empirique (1.0 = a=b)
 
 # ───────────────────────────────────────────────────────────────
 # PARALLÉLISME
