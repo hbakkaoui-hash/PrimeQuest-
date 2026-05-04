@@ -1,0 +1,629 @@
+%==============================================================================
+% Unconditional Primality Certificates for p = 3m(m+1)+1
+% H. Bakkaoui — 2026
+%==============================================================================
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[english]{babel}
+\usepackage{amsmath,amssymb,amsthm,mathtools}
+\usepackage{geometry}
+\geometry{margin=2.5cm}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{enumitem}
+\usepackage{caption}
+\usepackage[dvipsnames]{xcolor}
+\usepackage{tcolorbox}
+\tcbuselibrary{skins,breakable}
+\usepackage{hyperref}
+\hypersetup{colorlinks=true,linkcolor=MidnightBlue,
+            citecolor=MidnightBlue,urlcolor=MidnightBlue}
+\usepackage{cleveref}
+
+%--- Theorem-like environments -------------------------------------------------
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{proposition}[theorem]{Proposition}
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{corollary}[theorem]{Corollary}
+\theoremstyle{definition}
+\newtheorem{definition}[theorem]{Definition}
+\newtheorem{problem}[theorem]{Open Problem}
+\theoremstyle{remark}
+\newtheorem{remark}[theorem]{Remark}
+
+%--- Coloured boxes ------------------------------------------------------------
+\newtcolorbox{rigorousbox}[1][]{
+  colback=Green!8, colframe=Green!60!black, arc=1mm,
+  title=\textbf{Rigorous}, fonttitle=\bfseries, breakable, #1}
+\newtcolorbox{resultbox}[1][]{
+  colback=RoyalBlue!5, colframe=RoyalBlue!70!black, arc=1mm,
+  title=\textbf{Computational Result}, fonttitle=\bfseries, breakable, #1}
+\newtcolorbox{openprobbox}[1][]{
+  colback=Goldenrod!10, colframe=Goldenrod!70!black, arc=1mm,
+  title=\textbf{Open Problem}, fonttitle=\bfseries, breakable, #1}
+
+%--- Shortcuts -----------------------------------------------------------------
+\newcommand{\N}{\mathbb{N}}
+\newcommand{\Z}{\mathbb{Z}}
+\newcommand{\F}{\mathcal{F}}
+\newcommand{\Leg}[2]{\left(\dfrac{#1}{#2}\right)}
+
+%==============================================================================
+\title{Unconditional Primality Certificates\\
+for Numbers of the Form $p = 3m(m+1)+1$:\\[4pt]
+{\large Arithmetic Filters, Multi-Core Search,\\
+and Records to $29\,998$ Decimal Digits}}
+
+\author{Hassane \textsc{Bakkaoui}\\
+\small Independent Researcher\\
+\small \texttt{bakkahassa@hotmail.com}}
+
+\date{2026}
+%==============================================================================
+
+\begin{document}
+\maketitle
+
+%------------------------------------------------------------------------------
+\begin{abstract}
+We study the parametric subfamily $p = 3m(m+1)+1$, $m = 2^a\cdot 3^b - 1$,
+$a,b \in \N^*$, from the point of view of \emph{unconditional} primality
+certification via the Pocklington--Lehmer criterion
+\cite{Pocklington1914,LehmerPSW1975}.
+
+The 3-smooth structure $m+1 = 2^a\cdot 3^b$ provides, for every $(a,b)$,
+a fully factored divisor $F = 2^a\cdot 3^{b+1}$ of $p-1$ satisfying
+$F>\sqrt{p}$ unconditionally (Lemma~\ref{lem:factorisation}), reducing
+the certificate to finding witnesses for $q\in\{2,3\}$ only.
+
+We establish three arithmetic structure theorems:
+\begin{itemize}
+\item \textbf{Theorem~\ref{thm:mod6}:}
+  $p\equiv 1\pmod{6}$ for all $(a,b)$.
+\item \textbf{Theorem~\ref{thm:cubic}:}
+  every prime $q\equiv 2\pmod{3}$ satisfies $q\nmid p$,
+  reducing the sieve by $50\%$.
+  Proof: $-3$ is a non-residue mod $q$ when $q\equiv 2\pmod{3}$.
+\item \textbf{Theorem~\ref{thm:mod7}:}
+  $7\mid p$ if and only if $(a\bmod 3,\,b\bmod 6)\in\F$,
+  where $\F$ is an explicit set of \emph{six} pairs,
+  eliminating $33\%$ of candidates at zero arithmetic cost.
+  Proof: $\mathrm{ord}_7(2)=3$, $\mathrm{ord}_7(3)=6$.
+\end{itemize}
+
+Combined, these three results eliminate $\approx 87\%$ of all candidates
+before any large-number computation. The \textsc{PrimeQuest} multi-core
+algorithm (versions v1--v5) applies this pipeline to produce four
+unconditional Pocklington--Lehmer certificates, the largest being
+\[
+  p = 3m(m+1)+1,\quad m = 2^{19435}\cdot 3^{19173}-1,
+\]
+a prime of $\mathbf{29\,998}$ \textbf{decimal digits} found in
+$3$ h $06$ min on a single consumer laptop (ARM64, 9 cores).
+
+\smallskip
+\noindent\textbf{MSC 2020:} 11A41, 11Y11, 11N13.\\
+\textbf{Keywords:} primality certificate, Pocklington--Lehmer,
+centred hexagonal primes, arithmetic filters, quadratic residues,
+large prime records.
+\end{abstract}
+
+\tableofcontents
+
+%==============================================================================
+\section{Introduction}\label{sec:intro}
+%==============================================================================
+
+Proving unconditionally that a given integer is prime is a central task of
+computational number theory. For generic large primes, the most practical
+route is the Pocklington--Lehmer criterion~\cite{Pocklington1914,
+LehmerPSW1975}: exhibit a fully factored divisor $F>{\sqrt{p}}$ of $p-1$
+and verify witnesses. The key difficulty is finding such an $F$.
+
+The subfamily
+\[
+  p = 3m(m+1)+1,\qquad m = 2^a\cdot 3^b-1,\qquad a,b\in\N^*,
+\]
+is constructed so that $m+1=2^a\cdot 3^b$ is $3$-smooth by design,
+making $F=2^a\cdot 3^{b+1}$ fully factored and satisfying $F>\sqrt{p}$
+for every $(a,b)$ without any condition on $p$.
+
+Beyond the certificate structure, the family carries three independent
+arithmetic constraints (Theorems~\ref{thm:mod6}--\ref{thm:mod7}) that
+collectively remove $87\%$ of candidates before any large-number arithmetic.
+Exploiting all three, the \textsc{PrimeQuest} algorithm has produced four
+unconditional certificates up to $29\,998$ decimal digits.
+
+\smallskip
+\noindent\textbf{Relation to companion papers.}
+This paper is self-contained. The distributional and analytic aspects of
+the family (gap law, Hardy--Littlewood constant, connection to $\zeta(s)$)
+are treated in~\cite{PaperI,PaperII}.
+
+%==============================================================================
+\section{The Pocklington Subfamily}\label{sec:family}
+%==============================================================================
+
+\subsection{Definition and digit count}
+
+\begin{definition}[Pocklington subfamily]\label{def:pocklington}
+For integers $a,b\geq 1$, define
+\[
+  m(a,b) = 2^a\cdot 3^b - 1, \qquad
+  p(a,b) = 3m(m+1)+1 = 3m^2+3m+1.
+\]
+The decimal digit count of $p$ is
+$D(a,b) = \lfloor 2a\log_{10}2 + (2b+1)\log_{10}3\rfloor + 1.$
+\end{definition}
+
+\subsection{Factorisation of $p-1$ and the certificate structure}
+
+\begin{rigorousbox}
+\begin{lemma}[Explicit factorisation]\label{lem:factorisation}
+For $p$ as in Definition~\ref{def:pocklington},
+\[
+  p - 1 = 2^a\cdot 3^{b+1}\cdot m, \qquad F := 2^a\cdot 3^{b+1} > \sqrt{p}.
+\]
+\end{lemma}
+\end{rigorousbox}
+
+\begin{proof}
+Since $m+1=2^a\cdot 3^b$,
+\[
+  p-1 = 3m(m+1) = 3m\cdot 2^a\cdot 3^b = 2^a\cdot 3^{b+1}\cdot m.
+\]
+As $p = 3m^2+3m+1 < 3(m+1)^2$, we get $\sqrt{p}<\sqrt{3}(m+1)<3(m+1)=
+3\cdot 2^a\cdot 3^b = 2^a\cdot 3^{b+1} = F$.
+\end{proof}
+
+\begin{rigorousbox}
+\begin{theorem}[Pocklington--Lehmer certificate
+\cite{Pocklington1914,LehmerPSW1975}]\label{thm:Pocklington}
+Let $p = p(a,b)$ as in Definition~\ref{def:pocklington}. Then $p$ is prime
+if and only if there exist integers $w_2,w_3$ such that, for $q\in\{2,3\}$,
+\[
+  w_q^{p-1}\equiv 1\pmod{p}\quad\text{and}\quad
+  \gcd\!\bigl(w_q^{(p-1)/q}-1,\,p\bigr)=1.
+\]
+\end{theorem}
+\end{rigorousbox}
+
+\begin{corollary}\label{cor:pocklington}
+Theorem~\ref{thm:Pocklington} applies unconditionally to every candidate
+in the subfamily: by Lemma~\ref{lem:factorisation}, $F>\sqrt{p}$ always
+holds, and the certificate requires at most two witnesses
+($q\in\{2,3\}$ only).
+\end{corollary}
+
+\begin{remark}
+In all four certificates produced (Section~\ref{sec:results}),
+the witnesses $w_2 = 5$ and $w_3 = 7$ succeeded without exception.
+\end{remark}
+
+%==============================================================================
+\section{Arithmetic Structure Theorems}\label{sec:filters}
+%==============================================================================
+
+We establish three independent constraints on the family
+$p = 3m(m+1)+1$ with $m = 2^a\cdot 3^b-1$. Each is proved rigorously
+and translated into a concrete computational saving.
+
+\subsection{Congruence modulo 6}
+
+\begin{rigorousbox}
+\begin{theorem}[Modulo $6$]\label{thm:mod6}
+For all $a,b\geq 1$, $p(a,b)\equiv 1\pmod{6}$.
+\end{theorem}
+\end{rigorousbox}
+
+\begin{proof}
+\textit{Modulo $2$.} Since $m = 2^a\cdot 3^b-1$ is odd, $m(m+1)$ is even,
+so $3m(m+1)$ is even and $p = 3m(m+1)+1$ is odd.
+
+\textit{Modulo $3$.} We have $3\mid 3m(m+1)$, hence $p\equiv 1\pmod{3}$.
+
+Together, $p\equiv 1\pmod{2}$ and $p\equiv 1\pmod{3}$ give
+$p\equiv 1\pmod{6}$ by the Chinese Remainder Theorem.
+\end{proof}
+
+\begin{corollary}
+No prime $q\in\{2,3\}$ divides $p(a,b)$, and $p$ lies in the admissible
+class $+1$ modulo $6$ for every $(a,b)$.
+\end{corollary}
+
+\subsection{Cubic reciprocity sieve}
+
+\begin{rigorousbox}
+\begin{theorem}[Cubic reciprocity sieve]\label{thm:cubic}
+Let $m\in\N^*$, $p = 3m(m+1)+1$, and $q\geq 5$ a prime with
+$q\equiv 2\pmod{3}$. Then $q\nmid p$.
+\end{theorem}
+\end{rigorousbox}
+
+\begin{proof}
+The condition $q\mid p$ is equivalent to $3m^2+3m+1\equiv 0\pmod{q}$.
+Completing the square yields $(6m+3)^2\equiv -3\pmod{q}$, so $-3$ must be
+a quadratic residue modulo $q$. By the multiplicativity of the Legendre
+symbol and quadratic reciprocity~\cite{IrelandRosen},
+\[
+  \Leg{-3}{q} = \Leg{-1}{q}\Leg{3}{q}
+  = (-1)^{\frac{q-1}{2}}\cdot\Leg{q}{3}(-1)^{\frac{q-1}{2}\cdot\frac{3-1}{2}}.
+\]
+A direct evaluation shows $\bigl(\tfrac{-3}{q}\bigr)=+1$ if $q\equiv 1\pmod{3}$
+and $\bigl(\tfrac{-3}{q}\bigr)=-1$ if $q\equiv 2\pmod{3}$. In the latter case,
+$3m^2+3m+1\equiv 0\pmod{q}$ has no solution, so $q\nmid p$.
+\end{proof}
+
+\begin{corollary}[Sieve reduction by $50\%$]\label{cor:sieve-50}
+In trial division up to a bound $L$, only primes $q\equiv 1\pmod{3}$ need
+be tested. By Dirichlet's theorem, these account for half of all primes in
+$[5,L]$. Concretely: of the $78\,498$ primes in $[5,10^6]$, only $39\,231$
+satisfy $q\equiv 1\pmod{3}$.
+
+\smallskip
+\noindent\emph{Note.} Theorem~\ref{thm:cubic} holds for the general
+family $p=3m(m+1)+1$ with arbitrary $m\in\N^*$, independently of the
+3-smooth structure.
+\end{corollary}
+
+\subsection{Forbidden classes modulo $7$}
+
+\begin{rigorousbox}
+\begin{theorem}[Forbidden classes modulo $7$]\label{thm:mod7}
+Let $m = 2^a\cdot 3^b-1$, $a,b\geq 1$. Define
+\[
+  \F_7 = \bigl\{(0,2),(0,3),(1,0),(1,1),(2,4),(2,5)\bigr\}
+  \;\subset\; \{0,1,2\}\times\{0,1,2,3,4,5\}.
+\]
+Then
+\[
+  7\mid p(a,b)\quad\Longleftrightarrow\quad
+  (a\bmod 3,\;b\bmod 6)\in\F_7.
+\]
+In particular, exactly $|\F_7|/18 = 1/3$ of all classes are forbidden.
+\end{theorem}
+\end{rigorousbox}
+
+\begin{proof}
+Since $\mathrm{ord}_7(2)=3$ and $\mathrm{ord}_7(3)=6$, the value
+$m+1 = 2^a\cdot 3^b \bmod 7$ depends only on $r=a\bmod 3$ and
+$s=b\bmod 6$. Setting $t = t(r,s):= 2^r\cdot 3^s\bmod 7$,
+one has $m\equiv t-1\pmod{7}$ and
+\[
+  p \equiv 3(t-1)t+1 = 3t^2-3t+1\pmod{7}.
+\]
+The condition $7\mid p$ becomes $3t^2-3t+1\equiv 0\pmod{7}$.
+Multiplying by $5\equiv 3^{-1}\pmod{7}$:
+\[
+  t^2-t-2\equiv 0\pmod{7},\qquad(t-2)(t+1)\equiv 0\pmod{7},
+\]
+so $t\equiv 2$ or $t\equiv 6\pmod{7}$. Table~\ref{tab:t-values} lists
+all $3\times 6=18$ values of $t(r,s)$; exactly the six pairs in $\F_7$
+yield $t\in\{2,6\}$.
+\end{proof}
+
+\begin{table}[ht]\centering
+\caption{Values of $t(r,s)=2^r\cdot 3^s\bmod 7$.
+Entries in $\{2,6\}$ (bold) correspond to $7\mid p$;
+these are the six pairs of $\F_7$.}
+\label{tab:t-values}
+\begin{tabular}{@{}c|cccccc@{}}
+\toprule
+$r\;\backslash\; s$ & $0$ & $1$ & $2$ & $3$ & $4$ & $5$ \\
+\midrule
+$0$ & $1$ & $3$ & $\mathbf{2}$ & $\mathbf{6}$ & $4$ & $5$ \\
+$1$ & $\mathbf{2}$ & $\mathbf{6}$ & $4$ & $5$ & $1$ & $3$ \\
+$2$ & $4$ & $5$ & $1$ & $3$ & $\mathbf{2}$ & $\mathbf{6}$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{corollary}[Free $33\%$ elimination]\label{cor:t2-free}
+Checking $(a\bmod 3,\,b\bmod 6)\in\F_7$ requires only two modular
+reductions and a lookup in a six-element set — no arithmetic on
+$D$-digit numbers. When the search visits pairs $(a,b)$ uniformly over
+the $18$ residue classes (which holds in the zigzag search of
+Section~\ref{sec:algo}), exactly $1/3$ of all candidates are rejected
+at zero large-number cost.
+\end{corollary}
+
+\subsection{Combined elimination rate}
+
+\begin{proposition}[Combined filter efficiency]\label{prop:combined}
+Among all candidate pairs $(a,b)$ explored by the zigzag search:
+\begin{enumerate}[label=(\roman*)]
+\item Theorem~\ref{thm:mod7} eliminates $33.3\%$ (lookup, zero cost).
+\item Theorem~\ref{thm:cubic} reduces the sieve to $q\equiv 1\pmod{3}$;
+  among the $66.7\%$ remaining, the sieve eliminates a further $\approx
+  80\%$.
+\item The fraction reaching Miller--Rabin is $\approx 13\%$.
+\end{enumerate}
+For the $29\,998$-digit record ($2\,221$ pairs tested):
+$33.3\%$ by Theorem~\ref{thm:mod7},
+$53.8\%$ by sieve,
+$\mathbf{87.1\%}$ total.
+\end{proposition}
+
+%==============================================================================
+\section{The \textsc{PrimeQuest} Algorithm}\label{sec:algo}
+%==============================================================================
+
+\subsection{Centre calibration and zigzag}
+
+For target digit count $D$, the \emph{search centre} is
+\[
+  a_0 = b_0 = \Bigl\lfloor\frac{D}{2\log_{10}6}\Bigr\rfloor \approx 0.643\,D.
+\]
+The zigzag expands outward: for $\delta = 0, 1, 2, \ldots$ it alternates
+$a = a_0+\delta$ and $a = a_0-\delta$, enumerating for each $a$ all $b$
+with $|D(a,b)-D|\leq\tau$ (tolerance $\tau=10$).
+
+\begin{remark}
+Empirical observation: $b/a = 1.083$ at $D=19\,999$; $b/a = 0.987$ at
+$D=29\,998$. Since this ratio varies between primes, the symmetric choice
+$a_0=b_0$ minimises the worst-case distance to the prime zone.
+\end{remark}
+
+\subsection{Four-stage pipeline}
+
+Each pair $(a,b)$ passes through:
+\begin{enumerate}
+\item \textbf{Mod-$7$ filter} (Thm~\ref{thm:mod7}): reject if
+  $(a\bmod 3,b\bmod 6)\in\F_7$. Cost: $O(1)$.
+\item \textbf{Sieve} (Cor~\ref{cor:sieve-50}): for $q\equiv 1\pmod{3}$,
+  $q\leq L$, compute $p\bmod q$ via small modular exponentiations; reject
+  if $p\equiv 0$.
+\item \textbf{Miller--Rabin}: $k$ rounds on $p(a,b)$ in full precision.
+\item \textbf{Pocklington}: if MR passes, search for witnesses
+  $w_2,w_3$ of Theorem~\ref{thm:Pocklington}.
+\end{enumerate}
+
+\subsection{Multi-core execution and checkpoint}
+
+Pairs are distributed across CPU cores via a shared-memory pool. Workers
+suppress SIGINT/SIGTERM; checkpoint-resume every $60$ s enables exact
+restart after interruption.
+
+\subsection{Algorithm versions}
+
+\begin{table}[ht]\centering
+\caption{Successive versions of \textsc{PrimeQuest}.}
+\label{tab:versions}
+\begin{tabular}{@{}clcc@{}}
+\toprule
+Version & Optimisation added & MR rounds $k$ & Sieve limit $L$ \\
+\midrule
+v1 & Basic sequential search & $25$ & $10^6$ \\
+v2 & Sieve $\to$ $q\equiv 1\pmod{3}$ (Thm~\ref{thm:cubic}) & $25$ & $10^6$ \\
+v3 & Multi-core, checkpoint, centre calibration & $25$ & $10^6$ \\
+v4 & Mod-$7$ filter (Thm~\ref{thm:mod7}) & $25$ & $10^6$ \\
+v5 & $k\colon 25\to 3+20^{*}$; $L\colon 10^6\to 10^7$ & $3+20$ & $10^7$ \\
+\bottomrule
+\end{tabular}\\[3pt]
+\footnotesize $^{*}$ v5: $3$ initial rounds, then $20$ confirmation rounds
+before Pocklington.
+\end{table}
+
+\begin{remark}[Correctness of MR round reduction]
+Miller--Rabin is \emph{deterministic for primes}: every prime passes every
+round with certainty. Reducing $k$ from $25$ to $3$ carries zero risk of
+missing a true prime; rare composites passing $3$ rounds ($\leq 4^{-3}
+\approx 1.6\%$) are caught by the $20$ confirmation rounds and Pocklington.
+\end{remark}
+
+%==============================================================================
+\section{Computational Results}\label{sec:results}
+%==============================================================================
+
+\subsection{Four certified primes}
+
+\begin{resultbox}
+Table~\ref{tab:results} records the four unconditional
+Pocklington--Lehmer certificates. In every case: $w_2=5$ for $q=2$
+and $w_3=7$ for $q=3$.
+\end{resultbox}
+
+\begin{table}[ht]\centering
+\caption{Pocklington certificates from the \textsc{PrimeQuest} campaign.}
+\label{tab:results}
+\begin{tabular}{@{}rrrrrrrr@{}}
+\toprule
+Digits of $p$ & $a$ & $b$ & $b/a$ & MR tests & Elim. & Wall time & Workers \\
+\midrule
+$9\,998$  & $6\,212$  & $6\,738$  & $1.085$ & ---      & ---    & ---            & $1$ \\
+$10\,000$ & $6\,213$  & $6\,740$  & $1.085$ & ---      & ---    & ---            & $1$ \\
+$19\,999$ & $12\,228$ & $13\,242$ & $1.083$ & $1\,050$ & $87.9\%$ & $2$\,h\,$40$\,min & $9$ \\
+$29\,998$ & $19\,435$ & $19\,173$ & $0.987$ & $286$    & $87.1\%$ & $3$\,h\,$06$\,min & $9$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Certificate for the $29\,998$-digit prime}
+
+\begin{rigorousbox}
+The prime $p = 3m(m+1)+1$ with $m = 2^{19435}\cdot 3^{19173}-1$
+($14\,999$ digits) has the following unconditional certificate:
+\begin{align*}
+  p-1 &= F\cdot m,\quad F = 2^{19435}\cdot 3^{19174}
+         \;(15\,000\text{ digits}),\quad F>\sqrt{p}, \\
+  w_2 &= 5:\quad 5^{p-1}\equiv 1\pmod{p},\quad
+         \gcd(5^{(p-1)/2}-1,\,p)=1, \\
+  w_3 &= 7:\quad 7^{p-1}\equiv 1\pmod{p},\quad
+         \gcd(7^{(p-1)/3}-1,\,p)=1.
+\end{align*}
+The leading and trailing digits of $p$ are:
+\[
+  p = 1602087359509060348500\cdots 16930852697403293697.
+\]
+\end{rigorousbox}
+
+\subsection{Filter statistics for the $29\,998$-digit record}
+
+\begin{center}
+\begin{tabular}{@{}lrr@{}}
+\toprule
+Stage & Pairs eliminated & Fraction \\
+\midrule
+Mod-$7$ filter (Thm~\ref{thm:mod7}) & $740$ & $33.3\%$ \\
+Sieve (Cor~\ref{cor:sieve-50}) & $1\,195$ & $53.8\%$ \\
+Miller--Rabin (composites) & $285$ & $12.8\%$ \\
+\midrule
+\textbf{Total eliminated} & $2\,220$ & $\mathbf{87.1\%}$ \\
+Prime found & $1$ & $0.045\%$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+%==============================================================================
+\section{Performance and Scaling}\label{sec:scaling}
+%==============================================================================
+
+\subsection{Dominant cost}
+
+The dominant cost is Miller--Rabin: one round on a $D$-digit modulus
+costs $O(D^2\log D\log\log D)$ bit operations (GMP's FFT multiplication
+\cite{GMP}). Sieve and mod-$7$ checks are negligible by comparison.
+
+\subsection{Empirical scaling law}
+
+Wall-clock time per MR event (total time $\div$ MR test count),
+machine: Dell Inspiron 14 Plus (Snapdragon X Plus ARM64, 9 workers):
+
+\begin{center}
+\begin{tabular}{@{}rrrr@{}}
+\toprule
+$D$ & Rounds $k$ & $\tau_{\text{MR}}$ (wall) & Version \\
+\midrule
+$19\,999$ & $25$ & $\approx 9$\,s  & v3 \\
+$29\,998$ & $25$ & $\approx 39$\,s & v4 \\
+$29\,998$ & $3$  & $\approx 5$\,s  & v5 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The ratio $39/9 \approx 4.3$ for $D = 30\,000/20\,000 = 1.5\times$
+is consistent with empirical scaling $\tau \propto D^{2.5}$.
+
+\subsection{Projection: $50\,000$-digit record}
+
+With v5 ($k=3$) and scaling $D^{2.5}$:
+\[
+  \tau_{\text{MR}}(50\,000) \approx 5 \times\Bigl(\tfrac{50}{30}\Bigr)^{2.5}
+  \approx 18\text{ s/event}.
+\]
+For $400$--$500$ expected MR events: projected wall time
+$\mathbf{6}$--$\mathbf{10}$ \textbf{hours} (9 workers, same machine).
+A search is currently in progress.
+
+%==============================================================================
+\section{Open Problems}\label{sec:open}
+%==============================================================================
+
+\begin{openprobbox}
+\begin{problem}[Generalised arithmetic filters]\label{op:gen-filter}
+For primes $\ell\equiv 1\pmod{3}$, $\ell\in\{13,19,31,\ldots\}$, derive
+the forbidden set
+\[
+  \F_\ell = \bigl\{(a\bmod\mathrm{ord}_\ell(2),\;
+                    b\bmod\mathrm{ord}_\ell(3)) : \ell\mid p(a,b)\bigr\}.
+\]
+For $\ell=13$: $\mathrm{ord}_{13}(2)=12$, $\mathrm{ord}_{13}(3)=3$;
+the period is $36$ and the filter eliminates $2/13\approx 15\%$ of
+additional candidates.
+Combining filters for several small $\ell$ could push the pre-MR
+elimination rate above $90\%$.
+\end{problem}
+\end{openprobbox}
+
+\begin{openprobbox}
+\begin{problem}[$50\,000$-digit certificate]\label{op:50k}
+Produce an unconditional Pocklington certificate for a prime of
+$50\,000$ decimal digits in the subfamily. By Proposition~\ref{prop:combined},
+$\approx 87\%$ of candidates are pre-filtered; projected time is
+$6$--$10$ hours (v5, ARM64, 9 workers).
+\end{problem}
+\end{openprobbox}
+
+\begin{openprobbox}
+\begin{problem}[Universality of the witnesses $w_2=5$, $w_3=7$]
+\label{op:witnesses}
+In all four certificates, $w_2=5$ and $w_3=7$ succeeded. Prove (or
+disprove) that $5$ and $7$ are valid Pocklington witnesses for
+\emph{every} prime of the subfamily.
+\end{problem}
+\end{openprobbox}
+
+%==============================================================================
+\section{Conclusion}\label{sec:conclusion}
+%==============================================================================
+
+We have given a self-contained treatment of unconditional primality
+certificates for the 3-smooth subfamily $p=3m(m+1)+1$, $m=2^a\cdot 3^b-1$.
+
+Three elementary but effective arithmetic theorems — the mod-$6$ identity
+(Theorem~\ref{thm:mod6}), the cubic reciprocity sieve
+(Theorem~\ref{thm:cubic}), and the mod-$7$ forbidden-class filter
+(Theorem~\ref{thm:mod7}) — together eliminate $87\%$ of candidates
+before any large-number computation. Their proofs rest on standard tools:
+the Chinese Remainder Theorem, the non-residuacity of $-3$ modulo primes
+$q\equiv 2\pmod{3}$, and the multiplicative orders $\mathrm{ord}_7(2)=3$,
+$\mathrm{ord}_7(3)=6$.
+
+Applied via the \textsc{PrimeQuest} multi-core algorithm on a consumer
+laptop, this framework produced four unconditional certificates, culminating
+in a prime of $\mathbf{29\,998}$ decimal digits ($286$ MR events,
+$3$ h $6$ min). A fifth search targeting $50\,000$ digits is in progress.
+
+%==============================================================================
+\section*{Acknowledgements}
+%==============================================================================
+
+The author thanks the developers of \textsc{gmpy2} and GMP for making
+large-precision arithmetic accessible to independent researchers.
+Computations were performed on a Dell Inspiron 14 Plus 7441
+(Snapdragon X Plus ARM64, 10 Oryon cores, LPDDR5X memory).
+
+%==============================================================================
+\begin{thebibliography}{99}
+%==============================================================================
+
+\bibitem{PaperI}
+H.~Bakkaoui, \emph{A Parametric Family of Primes via Quadratic Forms:
+Heuristic Distribution of the Minimal Offset, Large-Scale Numerical
+Validation, and Statistical Control of Spurious Spectral Correlations},
+Working paper (Paper~I), 2026.
+
+\bibitem{PaperII}
+H.~Bakkaoui, \emph{Parametric Prime Families via Quadratic Forms: Layer
+Invariants, Conditional Proofs, and Connections to the Riemann Zeta
+Function}, Working paper (Paper~II), 2026.
+
+\bibitem{AKS2002}
+M.~Agrawal, N.~Kayal, and N.~Saxena, \emph{PRIMES is in P},
+Ann.\ of Math.\ \textbf{160} (2004), 781--793.
+
+\bibitem{GMP}
+T.~Granlund and the GMP development team,
+\emph{GNU Multiple Precision Arithmetic Library}, version~6.3.0,
+\texttt{https://gmplib.org}, 2023.
+
+\bibitem{LehmerPSW1975}
+J.~Brillhart, D.~H.~Lehmer, and J.~L.~Selfridge, \emph{New primality
+criteria and factorizations of $2^m\pm 1$},
+Math.\ Comp.\ \textbf{29} (1975), 620--647.
+
+\bibitem{Pocklington1914}
+H.~C.~Pocklington, \emph{The determination of the prime or composite
+nature of large numbers by Fermat's theorem},
+Proc.\ Cambridge Philos.\ Soc.\ \textbf{18} (1914--1916), 29--30.
+
+\bibitem{IrelandRosen}
+K.~Ireland and M.~Rosen, \emph{A Classical Introduction to Modern
+Number Theory}, 2nd edn., Springer, 1990.
+
+\end{thebibliography}
+
+\end{document}
