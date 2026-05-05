@@ -1,0 +1,645 @@
+%==============================================================================
+% Certificats de primalité inconditionnels pour p = 3m(m+1)+1
+% H. Bakkaoui — 2026
+%==============================================================================
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[french]{babel}
+\usepackage{amsmath,amssymb,amsthm,mathtools}
+\usepackage{geometry}
+\geometry{margin=2.5cm}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{enumitem}
+\usepackage{caption}
+\usepackage[dvipsnames]{xcolor}
+\usepackage{tcolorbox}
+\tcbuselibrary{skins,breakable}
+\usepackage{hyperref}
+\hypersetup{colorlinks=true,linkcolor=MidnightBlue,
+            citecolor=MidnightBlue,urlcolor=MidnightBlue}
+\usepackage{cleveref}
+
+%--- Environnements théorème --------------------------------------------------
+\newtheorem{theoreme}{Théorème}[section]
+\newtheorem{proposition}[theoreme]{Proposition}
+\newtheorem{lemme}[theoreme]{Lemme}
+\newtheorem{corollaire}[theoreme]{Corollaire}
+\theoremstyle{definition}
+\newtheorem{definition}[theoreme]{Définition}
+\newtheorem{probleme}[theoreme]{Problème ouvert}
+\theoremstyle{remark}
+\newtheorem{remarque}[theoreme]{Remarque}
+
+%--- Boîtes colorées ----------------------------------------------------------
+\newtcolorbox{rigorousbox}[1][]{
+  colback=Green!8, colframe=Green!60!black, arc=1mm,
+  title=\textbf{Résultat rigoureux}, fonttitle=\bfseries, breakable, #1}
+\newtcolorbox{resultbox}[1][]{
+  colback=RoyalBlue!5, colframe=RoyalBlue!70!black, arc=1mm,
+  title=\textbf{Résultat calculatoire}, fonttitle=\bfseries, breakable, #1}
+\newtcolorbox{openprobbox}[1][]{
+  colback=Goldenrod!10, colframe=Goldenrod!70!black, arc=1mm,
+  title=\textbf{Problème ouvert}, fonttitle=\bfseries, breakable, #1}
+
+%--- Raccourcis ---------------------------------------------------------------
+\newcommand{\N}{\mathbb{N}}
+\newcommand{\Z}{\mathbb{Z}}
+\newcommand{\F}{\mathcal{F}}
+\newcommand{\Leg}[2]{\left(\dfrac{#1}{#2}\right)}
+
+%==============================================================================
+\title{Certificats de primalité inconditionnels\\
+pour les entiers de la forme $p = 3m(m+1)+1$ :\\[4pt]
+{\large Filtres arithmétiques, recherche multi-cœurs\\
+et records jusqu'à $29\,998$ chiffres décimaux}}
+
+\author{Hassane \textsc{Bakkaoui}\\
+\small Chercheur indépendant\\
+\small \texttt{bakkahassa@hotmail.com}}
+
+\date{2026}
+%==============================================================================
+
+\begin{document}
+\maketitle
+
+%------------------------------------------------------------------------------
+\begin{abstract}
+Nous étudions la sous-famille paramétrique $p = 3m(m+1)+1$,
+$m = 2^a\cdot 3^b - 1$, $a,b \in \N^*$, du point de vue de la
+certification \emph{inconditionnelle} de primalité via le critère de
+Pocklington--Lehmer \cite{Pocklington1914,LehmerPSW1975}.
+
+La structure $3$-lisse de $m+1 = 2^a\cdot 3^b$ fournit, pour tout $(a,b)$,
+un diviseur complètement factorisé $F = 2^a\cdot 3^{b+1}$ de $p-1$
+satisfaisant $F>\sqrt{p}$ inconditionnellement
+(Lemme~\ref{lem:factorisation}), réduisant le certificat à la recherche
+de témoins pour $q\in\{2,3\}$ seulement.
+
+Nous établissons trois théorèmes de structure arithmétique :
+\begin{itemize}
+\item \textbf{Théorème~\ref{thm:mod6} :}
+  $p\equiv 1\pmod{6}$ pour tout $(a,b)$.
+\item \textbf{Théorème~\ref{thm:cubique} :}
+  tout premier $q\equiv 2\pmod{3}$ vérifie $q\nmid p$,
+  réduisant le crible de $50\%$.
+  Preuve : $-3$ est un non-résidu quadratique mod $q$ lorsque
+  $q\equiv 2\pmod{3}$.
+\item \textbf{Théorème~\ref{thm:mod7} :}
+  $7\mid p$ si et seulement si $(a\bmod 3,\,b\bmod 6)\in\F$,
+  où $\F$ est un ensemble explicite de \emph{six} paires,
+  éliminant $33\%$ des candidats à coût arithmétique nul.
+  Preuve : $\mathrm{ord}_7(2)=3$, $\mathrm{ord}_7(3)=6$.
+\end{itemize}
+
+Combinés, ces trois résultats éliminent $\approx 87\%$ de tous les
+candidats avant tout calcul en grande précision. L'algorithme
+multi-cœurs \textsc{PrimeQuest} (versions v1--v5) exploite ce pipeline
+pour produire quatre certificats de Pocklington--Lehmer inconditionnels,
+le plus grand étant
+\[
+  p = 3m(m+1)+1,\quad m = 2^{19435}\cdot 3^{19173}-1,
+\]
+un nombre premier de $\mathbf{29\,998}$ \textbf{chiffres décimaux} trouvé
+en $3$ h $06$ min sur un ordinateur portable grand public
+(ARM64, 9 cœurs).
+
+\smallskip
+\noindent\textbf{MSC 2020 :} 11A41, 11Y11, 11N13.\\
+\textbf{Mots-clés :} certificat de primalité, Pocklington--Lehmer,
+premiers hexagonaux centrés, filtres arithmétiques, résidus quadratiques,
+records de grands premiers.
+\end{abstract}
+
+\tableofcontents
+
+%==============================================================================
+\section{Introduction}\label{sec:intro}
+%==============================================================================
+
+Prouver inconditionnellement qu'un entier donné est premier est une tâche
+centrale de la théorie algorithmique des nombres. Pour les grands premiers
+génériques, la voie la plus pratique est le critère de
+Pocklington--Lehmer~\cite{Pocklington1914,LehmerPSW1975} : exhiber un
+diviseur complètement factorisé $F>\sqrt{p}$ de $p-1$ et vérifier des
+témoins. La difficulté principale réside dans la construction d'un tel $F$.
+
+La sous-famille
+\[
+  p = 3m(m+1)+1,\qquad m = 2^a\cdot 3^b-1,\qquad a,b\in\N^*,
+\]
+est construite de sorte que $m+1=2^a\cdot 3^b$ soit $3$-lisse par
+construction, rendant $F=2^a\cdot 3^{b+1}$ complètement factorisé et
+vérifiant $F>\sqrt{p}$ pour tout $(a,b)$, sans aucune condition sur $p$.
+
+Au-delà de la structure du certificat, la famille satisfait trois
+contraintes arithmétiques indépendantes
+(Théorèmes~\ref{thm:mod6}--\ref{thm:mod7}) qui éliminent collectivement
+$87\%$ des candidats avant tout calcul en grande précision. En exploitant
+ces trois résultats, l'algorithme \textsc{PrimeQuest} a produit quatre
+certificats inconditionnels jusqu'à $29\,998$ chiffres décimaux.
+
+\smallskip
+\noindent\textbf{Lien avec les articles compagnons.}
+Cet article est auto-contenu. Les aspects distributionnels et analytiques
+de la famille (loi des gaps, constante de Hardy--Littlewood, connexion à
+$\zeta(s)$) sont traités dans~\cite{PaperI,PaperII}.
+
+%==============================================================================
+\section{La sous-famille de Pocklington}\label{sec:famille}
+%==============================================================================
+
+\subsection{Définition et nombre de chiffres}
+
+\begin{definition}[Sous-famille de Pocklington]\label{def:pocklington}
+Pour des entiers $a,b\geq 1$, on définit
+\[
+  m(a,b) = 2^a\cdot 3^b - 1, \qquad
+  p(a,b) = 3m(m+1)+1 = 3m^2+3m+1.
+\]
+Le nombre de chiffres décimaux de $p$ est
+$D(a,b) = \lfloor 2a\log_{10}2 + (2b+1)\log_{10}3\rfloor + 1.$
+\end{definition}
+
+\subsection{Factorisation de $p-1$ et structure du certificat}
+
+\begin{rigorousbox}
+\begin{lemme}[Factorisation explicite]\label{lem:factorisation}
+Pour $p$ comme dans la Définition~\ref{def:pocklington},
+\[
+  p - 1 = 2^a\cdot 3^{b+1}\cdot m, \qquad F := 2^a\cdot 3^{b+1} > \sqrt{p}.
+\]
+\end{lemme}
+\end{rigorousbox}
+
+\begin{proof}
+Comme $m+1=2^a\cdot 3^b$,
+\[
+  p-1 = 3m(m+1) = 3m\cdot 2^a\cdot 3^b = 2^a\cdot 3^{b+1}\cdot m.
+\]
+Comme $p = 3m^2+3m+1 < 3(m+1)^2$, on obtient $\sqrt{p}<\sqrt{3}(m+1)
+<3(m+1)= 3\cdot 2^a\cdot 3^b = 2^a\cdot 3^{b+1} = F$.
+\end{proof}
+
+\begin{rigorousbox}
+\begin{theoreme}[Certificat de Pocklington--Lehmer
+\cite{Pocklington1914,LehmerPSW1975}]\label{thm:Pocklington}
+Soit $p = p(a,b)$ comme dans la Définition~\ref{def:pocklington}.
+Alors $p$ est premier si et seulement s'il existe des entiers $w_2,w_3$
+tels que, pour $q\in\{2,3\}$,
+\[
+  w_q^{p-1}\equiv 1\pmod{p}\quad\text{et}\quad
+  \gcd\!\bigl(w_q^{(p-1)/q}-1,\,p\bigr)=1.
+\]
+\end{theoreme}
+\end{rigorousbox}
+
+\begin{corollaire}\label{cor:pocklington}
+Le Théorème~\ref{thm:Pocklington} s'applique inconditionnellement à tout
+candidat de la sous-famille : par le Lemme~\ref{lem:factorisation},
+$F>\sqrt{p}$ est toujours vérifié, et le certificat requiert au plus
+deux témoins ($q\in\{2,3\}$ seulement).
+\end{corollaire}
+
+\begin{remarque}
+Dans les quatre certificats produits (Section~\ref{sec:resultats}),
+les témoins $w_2 = 5$ et $w_3 = 7$ ont réussi sans exception.
+\end{remarque}
+
+%==============================================================================
+\section{Théorèmes de structure arithmétique}\label{sec:filtres}
+%==============================================================================
+
+Nous établissons trois contraintes indépendantes sur la famille
+$p = 3m(m+1)+1$ avec $m = 2^a\cdot 3^b-1$. Chacune est prouvée
+rigoureusement et traduite en économie calculatoire concrète.
+
+\subsection{Congruence modulo 6}
+
+\begin{rigorousbox}
+\begin{theoreme}[Modulo $6$]\label{thm:mod6}
+Pour tout $a,b\geq 1$, $p(a,b)\equiv 1\pmod{6}$.
+\end{theoreme}
+\end{rigorousbox}
+
+\begin{proof}
+\textit{Modulo $2$.} Comme $m = 2^a\cdot 3^b-1$ est impair, $m(m+1)$
+est pair, donc $3m(m+1)$ est pair et $p = 3m(m+1)+1$ est impair.
+
+\textit{Modulo $3$.} On a $3\mid 3m(m+1)$, donc $p\equiv 1\pmod{3}$.
+
+Ensemble, $p\equiv 1\pmod{2}$ et $p\equiv 1\pmod{3}$ donnent
+$p\equiv 1\pmod{6}$ par le théorème chinois des restes.
+\end{proof}
+
+\begin{corollaire}
+Aucun premier $q\in\{2,3\}$ ne divise $p(a,b)$, et $p$ appartient à la
+classe admissible $+1$ modulo $6$ pour tout $(a,b)$.
+\end{corollaire}
+
+\subsection{Crible par réciprocité cubique}
+
+\begin{rigorousbox}
+\begin{theoreme}[Crible par réciprocité cubique]\label{thm:cubique}
+Soit $m\in\N^*$, $p = 3m(m+1)+1$, et $q\geq 5$ un premier avec
+$q\equiv 2\pmod{3}$. Alors $q\nmid p$.
+\end{theoreme}
+\end{rigorousbox}
+
+\begin{proof}
+La condition $q\mid p$ est équivalente à $3m^2+3m+1\equiv 0\pmod{q}$.
+En complétant le carré, on obtient $(6m+3)^2\equiv -3\pmod{q}$, donc
+$-3$ doit être un résidu quadratique modulo $q$. Par la multiplicativité
+du symbole de Legendre et la réciprocité quadratique~\cite{IrelandRosen},
+\[
+  \Leg{-3}{q} = \Leg{-1}{q}\Leg{3}{q}
+  = (-1)^{\frac{q-1}{2}}\cdot\Leg{q}{3}(-1)^{\frac{q-1}{2}\cdot\frac{3-1}{2}}.
+\]
+Un calcul direct montre $\bigl(\tfrac{-3}{q}\bigr)=+1$ si $q\equiv 1\pmod{3}$
+et $\bigl(\tfrac{-3}{q}\bigr)=-1$ si $q\equiv 2\pmod{3}$. Dans ce dernier
+cas, $3m^2+3m+1\equiv 0\pmod{q}$ n'a pas de solution, donc $q\nmid p$.
+\end{proof}
+
+\begin{corollaire}[Réduction du crible de $50\%$]\label{cor:crible-50}
+Dans la division d'essai jusqu'à une borne $L$, seuls les premiers
+$q\equiv 1\pmod{3}$ doivent être testés. Par le théorème de Dirichlet,
+ceux-ci représentent la moitié de tous les premiers dans $[5,L]$.
+Concrètement : des $78\,498$ premiers dans $[5,10^6]$, seulement
+$39\,231$ vérifient $q\equiv 1\pmod{3}$.
+
+\smallskip
+\noindent\emph{Note.} Le Théorème~\ref{thm:cubique} s'applique à la
+famille générale $p=3m(m+1)+1$ avec $m\in\N^*$ arbitraire,
+indépendamment de la structure $3$-lisse.
+\end{corollaire}
+
+\subsection{Classes interdites modulo $7$}
+
+\begin{rigorousbox}
+\begin{theoreme}[Classes interdites modulo $7$]\label{thm:mod7}
+Soit $m = 2^a\cdot 3^b-1$, $a,b\geq 1$. On définit
+\[
+  \F_7 = \bigl\{(0,2),(0,3),(1,0),(1,1),(2,4),(2,5)\bigr\}
+  \;\subset\; \{0,1,2\}\times\{0,1,2,3,4,5\}.
+\]
+Alors
+\[
+  7\mid p(a,b)\quad\Longleftrightarrow\quad
+  (a\bmod 3,\;b\bmod 6)\in\F_7.
+\]
+En particulier, exactement $|\F_7|/18 = 1/3$ de toutes les classes
+sont interdites.
+\end{theoreme}
+\end{rigorousbox}
+
+\begin{proof}
+Comme $\mathrm{ord}_7(2)=3$ et $\mathrm{ord}_7(3)=6$, la valeur
+$m+1 = 2^a\cdot 3^b \bmod 7$ ne dépend que de $r=a\bmod 3$ et
+$s=b\bmod 6$. En posant $t = t(r,s):= 2^r\cdot 3^s\bmod 7$,
+on a $m\equiv t-1\pmod{7}$ et
+\[
+  p \equiv 3(t-1)t+1 = 3t^2-3t+1\pmod{7}.
+\]
+La condition $7\mid p$ devient $3t^2-3t+1\equiv 0\pmod{7}$.
+En multipliant par $5\equiv 3^{-1}\pmod{7}$ :
+\[
+  t^2-t-2\equiv 0\pmod{7},\qquad(t-2)(t+1)\equiv 0\pmod{7},
+\]
+donc $t\equiv 2$ ou $t\equiv 6\pmod{7}$. Le Tableau~\ref{tab:valeurs-t}
+liste les $3\times 6=18$ valeurs de $t(r,s)$ ; exactement les six paires
+de $\F_7$ donnent $t\in\{2,6\}$.
+\end{proof}
+
+\begin{table}[ht]\centering
+\caption{Valeurs de $t(r,s)=2^r\cdot 3^s\bmod 7$.
+Les entrées dans $\{2,6\}$ (en gras) correspondent à $7\mid p$ ;
+ce sont les six paires de $\F_7$.}
+\label{tab:valeurs-t}
+\begin{tabular}{@{}c|cccccc@{}}
+\toprule
+$r\;\backslash\; s$ & $0$ & $1$ & $2$ & $3$ & $4$ & $5$ \\
+\midrule
+$0$ & $1$ & $3$ & $\mathbf{2}$ & $\mathbf{6}$ & $4$ & $5$ \\
+$1$ & $\mathbf{2}$ & $\mathbf{6}$ & $4$ & $5$ & $1$ & $3$ \\
+$2$ & $4$ & $5$ & $1$ & $3$ & $\mathbf{2}$ & $\mathbf{6}$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{corollaire}[Élimination gratuite de $33\%$]\label{cor:t2-gratuit}
+Vérifier $(a\bmod 3,\,b\bmod 6)\in\F_7$ ne requiert que deux réductions
+modulaires et une recherche dans un ensemble de six paires — aucune
+arithmétique sur des entiers à $D$ chiffres. Lorsque la recherche parcourt
+les paires $(a,b)$ uniformément sur les $18$ classes de résidus
+(ce qui est le cas dans la recherche en zigzag de la
+Section~\ref{sec:algo}), exactement $1/3$ de tous les candidats sont
+rejetés à coût nul.
+\end{corollaire}
+
+\subsection{Taux d'élimination combiné}
+
+\begin{proposition}[Efficacité combinée des filtres]\label{prop:combine}
+Parmi tous les couples $(a,b)$ candidats explorés par la recherche en
+zigzag :
+\begin{enumerate}[label=(\roman*)]
+\item Le Théorème~\ref{thm:mod7} élimine $33{,}3\%$ (consultation, coût nul).
+\item Le Théorème~\ref{thm:cubique} réduit le crible à $q\equiv 1\pmod{3}$ ;
+  parmi les $66{,}7\%$ restants, le crible élimine encore $\approx 80\%$.
+\item La fraction atteignant Miller--Rabin est $\approx 13\%$.
+\end{enumerate}
+Pour le record à $29\,998$ chiffres ($2\,221$ couples testés) :
+$33{,}3\%$ par le Théorème~\ref{thm:mod7},
+$53{,}8\%$ par le crible,
+$\mathbf{87{,}1\%}$ au total.
+\end{proposition}
+
+%==============================================================================
+\section{L'algorithme \textsc{PrimeQuest}}\label{sec:algo}
+%==============================================================================
+
+\subsection{Calibration du centre et zigzag}
+
+Pour un nombre cible de $D$ chiffres, le \emph{centre de recherche} est
+\[
+  a_0 = b_0 = \Bigl\lfloor\frac{D}{2\log_{10}6}\Bigr\rfloor \approx 0{,}643\,D.
+\]
+Le zigzag s'étend vers l'extérieur : pour $\delta = 0, 1, 2, \ldots$,
+il alterne $a = a_0+\delta$ et $a = a_0-\delta$, en énumérant pour chaque
+$a$ tous les $b$ avec $|D(a,b)-D|\leq\tau$ (tolérance $\tau=10$).
+
+\begin{remarque}
+Observation empirique : $b/a = 1{,}083$ pour $D=19\,999$ ;
+$b/a = 0{,}987$ pour $D=29\,998$. Comme ce ratio varie entre les premiers,
+le choix symétrique $a_0=b_0$ minimise la distance dans le pire cas à
+la zone des premiers.
+\end{remarque}
+
+\subsection{Pipeline à quatre étapes}
+
+Chaque couple $(a,b)$ passe par :
+\begin{enumerate}
+\item \textbf{Filtre mod-$7$} (Thm~\ref{thm:mod7}) : rejeter si
+  $(a\bmod 3,b\bmod 6)\in\F_7$. Coût : $O(1)$.
+\item \textbf{Crible} (Cor~\ref{cor:crible-50}) : pour $q\equiv 1\pmod{3}$,
+  $q\leq L$, calculer $p\bmod q$ via des exponentiations modulaires
+  sur petits entiers ; rejeter si $p\equiv 0$.
+\item \textbf{Miller--Rabin} : $k$ tours sur $p(a,b)$ en pleine précision.
+\item \textbf{Pocklington} : si MR réussit, chercher des témoins
+  $w_2,w_3$ du Théorème~\ref{thm:Pocklington}.
+\end{enumerate}
+
+\subsection{Exécution multi-cœurs et point de reprise}
+
+Les couples sont distribués entre les cœurs via un pool à mémoire partagée.
+Les workers ignorent SIGINT/SIGTERM ; la sauvegarde de point de reprise
+toutes les $60$ s permet un redémarrage exact après interruption.
+
+\subsection{Versions de l'algorithme}
+
+\begin{table}[ht]\centering
+\caption{Versions successives de \textsc{PrimeQuest}.}
+\label{tab:versions}
+\begin{tabular}{@{}clcc@{}}
+\toprule
+Version & Optimisation ajoutée & Tours MR $k$ & Limite crible $L$ \\
+\midrule
+v1 & Recherche séquentielle de base & $25$ & $10^6$ \\
+v2 & Crible $\to$ $q\equiv 1\pmod{3}$ (Thm~\ref{thm:cubique}) & $25$ & $10^6$ \\
+v3 & Multi-cœurs, point de reprise, calibration centre & $25$ & $10^6$ \\
+v4 & Filtre mod-$7$ (Thm~\ref{thm:mod7}) & $25$ & $10^6$ \\
+v5 & $k\colon 25\to 3+20^{*}$ ; $L\colon 10^6\to 10^7$ & $3+20$ & $10^7$ \\
+\bottomrule
+\end{tabular}\\[3pt]
+\footnotesize $^{*}$ v5 : $3$ tours initiaux, puis $20$ tours de
+confirmation avant Pocklington.
+\end{table}
+
+\begin{remarque}[Correction de la réduction des tours MR]
+Miller--Rabin est \emph{déterministe pour les premiers} : tout nombre
+premier passe chaque tour avec certitude. Réduire $k$ de $25$ à $3$ ne
+présente aucun risque de manquer un vrai premier ; les composites rares
+passant $3$ tours ($\leq 4^{-3}\approx 1{,}6\%$) sont rattrapés par
+les $20$ tours de confirmation et le test de Pocklington.
+\end{remarque}
+
+%==============================================================================
+\section{Résultats calculatoires}\label{sec:resultats}
+%==============================================================================
+
+\subsection{Quatre premiers certifiés}
+
+\begin{resultbox}
+Le Tableau~\ref{tab:resultats} regroupe les quatre certificats
+inconditionnels de Pocklington--Lehmer. Dans chaque cas :
+$w_2=5$ pour $q=2$ et $w_3=7$ pour $q=3$.
+\end{resultbox}
+
+\begin{table}[ht]\centering
+\caption{Certificats Pocklington de la campagne \textsc{PrimeQuest}.}
+\label{tab:resultats}
+\begin{tabular}{@{}rrrrrrrr@{}}
+\toprule
+Chiffres de $p$ & $a$ & $b$ & $b/a$ & Tests MR & Élim. & Temps & Workers \\
+\midrule
+$9\,998$  & $6\,212$  & $6\,738$  & $1{,}085$ & ---      & ---      & ---             & $1$ \\
+$10\,000$ & $6\,213$  & $6\,740$  & $1{,}085$ & ---      & ---      & ---             & $1$ \\
+$19\,999$ & $12\,228$ & $13\,242$ & $1{,}083$ & $1\,050$ & $87{,}9\%$ & $2$\,h\,$40$\,min & $9$ \\
+$29\,998$ & $19\,435$ & $19\,173$ & $0{,}987$ & $286$    & $87{,}1\%$ & $3$\,h\,$06$\,min & $9$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Certificat du premier à $29\,998$ chiffres}
+
+\begin{rigorousbox}
+Le nombre premier $p = 3m(m+1)+1$ avec $m = 2^{19435}\cdot 3^{19173}-1$
+($14\,999$ chiffres) admet le certificat inconditionnel suivant :
+\begin{align*}
+  p-1 &= F\cdot m,\quad F = 2^{19435}\cdot 3^{19174}
+         \;(15\,000\text{ chiffres}),\quad F>\sqrt{p}, \\
+  w_2 &= 5:\quad 5^{p-1}\equiv 1\pmod{p},\quad
+         \gcd(5^{(p-1)/2}-1,\,p)=1, \\
+  w_3 &= 7:\quad 7^{p-1}\equiv 1\pmod{p},\quad
+         \gcd(7^{(p-1)/3}-1,\,p)=1.
+\end{align*}
+Les premiers et derniers chiffres de $p$ sont :
+\[
+  p = 1602087359509060348500\cdots 16930852697403293697.
+\]
+\end{rigorousbox}
+
+\subsection{Statistiques des filtres pour le record à $29\,998$ chiffres}
+
+\begin{center}
+\begin{tabular}{@{}lrr@{}}
+\toprule
+Étape & Couples éliminés & Fraction \\
+\midrule
+Filtre mod-$7$ (Thm~\ref{thm:mod7}) & $740$ & $33{,}3\%$ \\
+Crible (Cor~\ref{cor:crible-50}) & $1\,195$ & $53{,}8\%$ \\
+Miller--Rabin (composites) & $285$ & $12{,}8\%$ \\
+\midrule
+\textbf{Total éliminé} & $2\,220$ & $\mathbf{87{,}1\%}$ \\
+Premier trouvé & $1$ & $0{,}045\%$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+%==============================================================================
+\section{Performance et mise à l'échelle}\label{sec:echelle}
+%==============================================================================
+
+\subsection{Coût dominant}
+
+Le coût dominant est Miller--Rabin : un tour sur un module à $D$ chiffres
+coûte $O(D^2\log D\log\log D)$ opérations binaires (multiplication FFT
+de GMP \cite{GMP}). Les vérifications de crible et mod-$7$ sont
+négligeables en comparaison.
+
+\subsection{Loi de mise à l'échelle empirique}
+
+Temps d'horloge par événement MR (temps total $\div$ nombre de tests MR),
+machine : Dell Inspiron 14 Plus (Snapdragon X Plus ARM64, 9 workers) :
+
+\begin{center}
+\begin{tabular}{@{}rrrr@{}}
+\toprule
+$D$ & Tours $k$ & $\tau_{\text{MR}}$ (horloge) & Version \\
+\midrule
+$19\,999$ & $25$ & $\approx 9$\,s  & v3 \\
+$29\,998$ & $25$ & $\approx 39$\,s & v4 \\
+$29\,998$ & $3$  & $\approx 5$\,s  & v5 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Le rapport $39/9 \approx 4{,}3$ pour $D = 30\,000/20\,000 = 1{,}5\times$
+est cohérent avec la mise à l'échelle empirique $\tau \propto D^{2,5}$.
+
+\subsection{Projection : record à $50\,000$ chiffres}
+
+Avec v5 ($k=3$) et la mise à l'échelle $D^{2,5}$ :
+\[
+  \tau_{\text{MR}}(50\,000) \approx 5 \times\Bigl(\tfrac{50}{30}\Bigr)^{2,5}
+  \approx 18\text{ s/événement}.
+\]
+Pour $400$--$500$ événements MR attendus : temps total projeté
+$\mathbf{6}$--$\mathbf{10}$ \textbf{heures} (9 workers, même machine).
+Une recherche est actuellement en cours.
+
+%==============================================================================
+\section{Problèmes ouverts}\label{sec:ouverts}
+%==============================================================================
+
+\begin{openprobbox}
+\begin{probleme}[Filtres arithmétiques généralisés]\label{op:filtre-gen}
+Pour les premiers $\ell\equiv 1\pmod{3}$, $\ell\in\{13,19,31,\ldots\}$,
+dériver l'ensemble interdit
+\[
+  \F_\ell = \bigl\{(a\bmod\mathrm{ord}_\ell(2),\;
+                    b\bmod\mathrm{ord}_\ell(3)) : \ell\mid p(a,b)\bigr\}.
+\]
+Pour $\ell=13$ : $\mathrm{ord}_{13}(2)=12$, $\mathrm{ord}_{13}(3)=3$ ;
+la période est $36$ et le filtre élimine $2/13\approx 15\%$ de candidats
+supplémentaires. La combinaison de filtres pour plusieurs petits $\ell$
+pourrait porter le taux d'élimination pré-MR au-dessus de $90\%$.
+\end{probleme}
+\end{openprobbox}
+
+\begin{openprobbox}
+\begin{probleme}[Certificat à $50\,000$ chiffres]\label{op:50k}
+Produire un certificat de Pocklington inconditionnel pour un premier de
+$50\,000$ chiffres décimaux dans la sous-famille. Par la
+Proposition~\ref{prop:combine}, $\approx 87\%$ des candidats sont
+pré-filtrés ; le temps projeté est $6$--$10$ heures (v5, ARM64, 9 workers).
+\end{probleme}
+\end{openprobbox}
+
+\begin{openprobbox}
+\begin{probleme}[Universalité des témoins $w_2=5$, $w_3=7$]
+\label{op:temoins}
+Dans les quatre certificats, $w_2=5$ et $w_3=7$ ont réussi. Prouver
+(ou réfuter) que $5$ et $7$ sont des témoins de Pocklington valides
+pour \emph{tout} premier de la sous-famille.
+\end{probleme}
+\end{openprobbox}
+
+%==============================================================================
+\section{Conclusion}\label{sec:conclusion}
+%==============================================================================
+
+Nous avons donné un traitement auto-contenu des certificats de primalité
+inconditionnels pour la sous-famille $3$-lisse $p=3m(m+1)+1$,
+$m=2^a\cdot 3^b-1$.
+
+Trois théorèmes arithmétiques élémentaires mais efficaces — l'identité
+mod-$6$ (Théorème~\ref{thm:mod6}), le crible par réciprocité cubique
+(Théorème~\ref{thm:cubique}), et le filtre des classes interdites mod-$7$
+(Théorème~\ref{thm:mod7}) — éliminent ensemble $87\%$ des candidats avant
+tout calcul en grande précision. Leurs preuves reposent sur des outils
+standard : le théorème chinois des restes, la non-résidualité de $-3$
+modulo les premiers $q\equiv 2\pmod{3}$, et les ordres multiplicatifs
+$\mathrm{ord}_7(2)=3$, $\mathrm{ord}_7(3)=6$.
+
+Appliqué via l'algorithme multi-cœurs \textsc{PrimeQuest} sur un
+ordinateur portable grand public, ce cadre a produit quatre certificats
+inconditionnels, culminant en un premier de $\mathbf{29\,998}$ chiffres
+décimaux ($286$ événements MR, $3$ h $06$ min). Une cinquième recherche
+ciblant $50\,000$ chiffres est en cours.
+
+%==============================================================================
+\section*{Remerciements}
+%==============================================================================
+
+L'auteur remercie les développeurs de \textsc{gmpy2} et de GMP pour avoir
+rendu l'arithmétique en grande précision accessible aux chercheurs
+indépendants. Les calculs ont été effectués sur un Dell Inspiron 14 Plus 7441
+(Snapdragon X Plus ARM64, 10 cœurs Oryon, mémoire LPDDR5X).
+
+%==============================================================================
+\begin{thebibliography}{99}
+%==============================================================================
+
+\bibitem{PaperI}
+H.~Bakkaoui, \emph{Une famille paramétrique de premiers via les formes
+quadratiques : distribution heuristique du décalage minimal, validation
+numérique à grande échelle et contrôle statistique des corrélations
+spectrales spurieuses},
+Document de travail (Article~I), 2026.
+
+\bibitem{PaperII}
+H.~Bakkaoui, \emph{Familles de premiers paramétriques via les formes
+quadratiques : invariants de couche, preuves conditionnelles et connexions
+à la fonction zêta de Riemann},
+Document de travail (Article~II), 2026.
+
+\bibitem{AKS2002}
+M.~Agrawal, N.~Kayal et N.~Saxena, \emph{PRIMES is in P},
+Ann.\ of Math.\ \textbf{160} (2004), 781--793.
+
+\bibitem{GMP}
+T.~Granlund et l'équipe de développement GMP,
+\emph{GNU Multiple Precision Arithmetic Library}, version~6.3.0,
+\texttt{https://gmplib.org}, 2023.
+
+\bibitem{LehmerPSW1975}
+J.~Brillhart, D.~H.~Lehmer et J.~L.~Selfridge, \emph{New primality
+criteria and factorizations of $2^m\pm 1$},
+Math.\ Comp.\ \textbf{29} (1975), 620--647.
+
+\bibitem{Pocklington1914}
+H.~C.~Pocklington, \emph{The determination of the prime or composite
+nature of large numbers by Fermat's theorem},
+Proc.\ Cambridge Philos.\ Soc.\ \textbf{18} (1914--1916), 29--30.
+
+\bibitem{IrelandRosen}
+K.~Ireland et M.~Rosen, \emph{A Classical Introduction to Modern
+Number Theory}, 2\textsuperscript{e} éd., Springer, 1990.
+
+\end{thebibliography}
+
+\end{document}
