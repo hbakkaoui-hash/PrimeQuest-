@@ -54,19 +54,33 @@ CHECKPOINT_S     = 60          # sauvegarde checkpoint toutes les 60s
 CHECKPOINT_FILE  = f"checkpoint_{DIGITS_CIBLE}_v6.json"
 
 # ───────────────────────────────────────────────────────────────
-# [V6] RATIOS b/a explorés simultanément
+# [V6] RATIOS b/a — génération automatique bornée par la tolérance
 # ───────────────────────────────────────────────────────────────
-# Chaque ratio définit un centre indépendant dans l'espace (a, b).
-# Les centres sont parcourus en round-robin : on prend une paire
-# de chaque ratio à tour de rôle, couvrant tous les territoires
-# en parallèle.
+# Pour p = 3m(m+1)+1 ≈ (2^a·3^b)²  avoir D ± tol chiffres :
 #
-# Résultats observés (référence) :
+#   log₁₀(p) ≈ 2a·log₁₀(2) + (2b+1)·log₁₀(3)
+#
+# Pour un ratio r = b/a, le centre (a₀, b₀) est calibré pour donner
+# exactement D chiffres :
+#   a₀ = D/2 / (log₁₀(2) + r·log₁₀(3))   b₀ = a₀·r
+#
+# Bornes valides déduites de la tolérance :
+#   r_min = 2·log₁₀(2) / D        (b₀≥1 quand a₀→a_max)
+#   r_max = (D/2 − log₁₀(2)) / log₁₀(3)   (a₀≥1 quand b₀→b_max)
+#
+# Pour chaque a du zigzag, b_valides() filtre les b tels que
+# |log₁₀(p) − D| ≤ tol — garantie inconditionnelle.
+#
+# Paramètres de génération :
+N_RATIOS      = 7       # nombre de ratios à explorer simultanément
+RATIO_CENTRE  = 1.00    # ratio central (empirique : 0.987–1.085 sur primes connus)
+RATIO_SPREAD  = 0.15    # demi-amplitude : ratios dans [CENTRE−SPREAD, CENTRE+SPREAD]
+#
+# Résultats observés :
 #   9 998 ch.  (a=6212,  b=6738)  : b/a = 1.085
 #   10 000 ch. (a=6213,  b=6740)  : b/a = 1.085
 #   19 999 ch. (a=12228, b=13242) : b/a = 1.083
 #   29 998 ch. (a=19435, b=19173) : b/a = 0.987
-RATIOS_LIST = [0.85, 0.90, 0.95, 1.00, 1.05, 1.10, 1.15]
 
 # ───────────────────────────────────────────────────────────────
 # PARALLÉLISME
@@ -77,6 +91,38 @@ N_WORKERS_PARAM = 0            # 0 = auto (cpu_count - 1), >0 = valeur fixe
 
 LOG10_2 = math.log10(2)
 LOG10_3 = math.log10(3)
+
+# ── Bornes mathématiques des ratios valides ───────────────────────────────────
+# Pour un centre (a₀, b₀) avec b₀ = a₀·r ≥ 1 et a₀ ≥ 1 :
+_RATIO_MIN_ABSOLU = 2 * LOG10_2 / DIGITS_CIBLE          # b₀ ≥ 1 quand a₀→max
+_RATIO_MAX_ABSOLU = (DIGITS_CIBLE / 2 - LOG10_2) / LOG10_3  # a₀ ≥ 1 quand b₀→max
+
+# Génération de RATIOS_LIST : N_RATIOS valeurs régulièrement espacées dans
+# [RATIO_CENTRE − RATIO_SPREAD, RATIO_CENTRE + RATIO_SPREAD],
+# clampées aux bornes absolues et validées par b_valides.
+def _generer_ratios():
+    step = (2 * RATIO_SPREAD / (N_RATIOS - 1)) if N_RATIOS > 1 else 0
+    candidats = [
+        round(RATIO_CENTRE - RATIO_SPREAD + i * step, 4)
+        for i in range(N_RATIOS)
+    ]
+    valides = []
+    for r in candidats:
+        if r < _RATIO_MIN_ABSOLU or r > _RATIO_MAX_ABSOLU:
+            print(f"  ⚠  Ratio {r} hors bornes [{_RATIO_MIN_ABSOLU:.6f}, "
+                  f"{_RATIO_MAX_ABSOLU:.2f}] — ignoré")
+            continue
+        ac = max(1, int((DIGITS_CIBLE / 2) / (LOG10_2 + r * LOG10_3)))
+        bc = int(ac * r)
+        if bc < 1:
+            print(f"  ⚠  Ratio {r} → b₀={bc} < 1 — ignoré")
+            continue
+        valides.append(r)
+    if not valides:
+        raise ValueError("Aucun ratio valide — ajuster RATIO_CENTRE ou RATIO_SPREAD.")
+    return valides
+
+RATIOS_LIST = _generer_ratios()
 
 # ── Théorème 2 — classes interdites mod 7 ────────────────────────────────────
 FORBIDDEN_T2 = frozenset({(0,2),(0,3),(1,0),(1,1),(2,4),(2,5)})
@@ -309,7 +355,7 @@ if __name__ == '__main__':
         bc = int(ac * r)
         centres.append((ac, bc))
 
-    N_RATIOS = len(RATIOS_LIST)
+    N_RATIOS_ACTIFS = len(RATIOS_LIST)
 
     # État initial
     cp = charger_checkpoint()
@@ -322,11 +368,11 @@ if __name__ == '__main__':
         n_mr     = cp["n_mr"]
         n_paires = cp["n_paires"]
         t_cumul  = cp["t_cumul"]
-        print(f"\n  ♻  REPRISE v6 : {sum(1 for d in deltas if d is not None)}/{N_RATIOS} ratios actifs")
+        print(f"\n  ♻  REPRISE v6 : {sum(1 for d in deltas if d is not None)}/{N_RATIOS_ACTIFS} ratios actifs")
         print(f"     Cumulé : {t_cumul/3600:.2f}h  |  MR : {n_mr}")
     else:
-        deltas   = [0] * N_RATIOS
-        sides    = [0] * N_RATIOS
+        deltas   = [0] * N_RATIOS_ACTIFS
+        sides    = [0] * N_RATIOS_ACTIFS
         n_t2 = n_crible = n_mr = n_paires = 0
         t_cumul = 0.0
         print(f"\n  Nouvelle recherche v6 (aucun checkpoint)")
@@ -335,8 +381,12 @@ if __name__ == '__main__':
     print(f"  PrimeQuest v6 — p = 3m(m+1)+1,  m = 2^a·3^b−1")
     print(f"{'═'*70}")
     print(f"  Cible          : {DIGITS_CIBLE:,} chiffres (±{TOLERANCE})")
-    print(f"  Ratios b/a     : {RATIOS_LIST}")
-    print(f"  Centres (a₀)   : {[c[0] for c in centres]}")
+    print(f"  Bornes ratios  : [{_RATIO_MIN_ABSOLU:.6f},  {_RATIO_MAX_ABSOLU:.2f}]  "
+          f"(contraintes D={DIGITS_CIBLE}, b₀≥1, a₀≥1)")
+    print(f"  Plage choisie  : [{RATIO_CENTRE-RATIO_SPREAD:.3f},  {RATIO_CENTRE+RATIO_SPREAD:.3f}]"
+          f"  (centre={RATIO_CENTRE} ± {RATIO_SPREAD})")
+    print(f"  Ratios actifs  : {RATIOS_LIST}")
+    print(f"  Centres (a₀,b₀): {centres}")
     print(f"  a_max          : {a_max:,}")
     print(f"  Workers        : {N_WORKERS}  (batch {BATCH} paires)")
     print(f"  Crible         : {len(PREMIERS):,} premiers q≡1(mod3) ≤ {SIEVE_LIMIT:,}")
@@ -390,7 +440,7 @@ if __name__ == '__main__':
                 actifs    = sum(1 for d in deltas if d is not None)
                 print(
                     f"  [{elapsed_total/3600:5.2f}h]  "
-                    f"ratios_actifs={actifs}/{N_RATIOS}  "
+                    f"ratios_actifs={actifs}/{N_RATIOS_ACTIFS}  "
                     f"paires={n_paires:,}  T2={n_t2:,}  crible={n_crible:,}  "
                     f"MR={n_mr}  élim={elim_tot/max(n_paires,1)*100:.1f}%  "
                     f"~{taux:.0f}s/MR  restant={restant/60:.0f}min",
@@ -518,7 +568,7 @@ if __name__ == '__main__':
         print(f"""
   Temps session           : {t_session/3600:.2f}h
   Temps total cumulé      : {t_total/3600:.2f}h
-  Ratios actifs           : {actifs}/{N_RATIOS}
+  Ratios actifs           : {actifs}/{N_RATIOS_ACTIFS}
   Paires testées          : {n_paires:,}
   Filtrées Théorème 2     : {n_t2:,}  ({n_t2/max(n_paires,1)*100:.1f}%)
   Éliminées crible        : {n_crible:,}  ({n_crible/max(n_paires,1)*100:.1f}%)
