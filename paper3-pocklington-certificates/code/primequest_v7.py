@@ -1,33 +1,31 @@
 #!/usr/bin/env python3
 """
-PrimeQuest v6 — Exploration Multi-Ratio b/a
+PrimeQuest v7 — Spread Adaptatif + Tolérance élargie
 Famille : p = 3m(m+1)+1,  m = 2^a · 3^b − 1
 Preuve  : Théorème de Pocklington N-1
 
-Optimisations cumulées (v1 → v6) :
+Optimisations cumulées (v1 → v7) :
   1. Crible restreint aux q ≡ 1 (mod 3) — Théorème 3 (~50% candidats en moins)
   2. Filtrage Théorème 2 — 7|p détecté sans calcul si (a%3,b%6) interdit
      → élimine ~33% des paires supplémentaires, coût nul
   3. Parallélisation multi-cœurs via multiprocessing (auto-détection)
   4. Checkpoint toutes les 60s — reprise exacte après interruption
   5. MR_TOURS = 3 au lieu de 25 (facteur 8× sur le coût dominant)
-     Justification : Miller-Rabin est DÉTERMINISTE pour les premiers —
-     un premier passe TOUJOURS. Les faux positifs (~1.6%) sont
-     filtrés par MR_TOURS_CONFIRM + Pocklington.
-  6. SIEVE_LIMIT = 10 000 000 — 664 579 primes q≡1(mod3), ~15% MR en moins.
-  [v6] 7. RATIOS_LIST : exploration simultanée de plusieurs ratios b/a
-     Chaque ratio définit un centre (a₀, b₀) distinct dans l'espace (a,b).
-     Lors de chaque batch, les paires sont générées en round-robin sur
-     tous les centres actifs.
-     → Couvre len(RATIOS_LIST)× plus de territoire par session.
-     → Augmente la probabilité de tomber sur un premier sans changer
-       la densité théorique (le TNP ne dépend pas du ratio).
-     Ratios par défaut : [0.85, 0.90, 0.95, 1.00, 1.05, 1.10, 1.15]
+  6. SIEVE_LIMIT = 10 000 000 — 664 579 primes q≡1(mod3)
+  [v6] 7. Multi-ratio round-robin : plusieurs centres (a₀,b₀) explorés
+     simultanément, bornes r_min/r_max calculées depuis DIGITS_CIBLE.
+  [v7] 8. TOLERANCE = 50 : accepte p dans [D−50, D+50] chiffres
+     → b_valides() retourne ~5× plus de candidats par valeur de a
+     → densité de premiers ~5× plus élevée sans surcoût arithmétique.
+  [v7] 9. Spread adaptatif : après chaque ADAPT_INTERVAL tests MR sans
+     succès, N_RATIOS_ACTIFS augmente de 2 (un ratio de chaque côté).
+     Démarre sur N_RATIOS_INIT ratios (plage ±SPREAD_INIT),
+     s'élargit automatiquement jusqu'à N_RATIOS_MAX (plage ±SPREAD_MAX).
+     Effet : la recherche reste focalisée puis s'élargit si nécessaire.
 
-Gain global v6 vs v5 : facteur ~len(RATIOS_LIST) sur la couverture spatiale.
-
-Usage : python primequest_v6.py
-        Modifier DIGITS_CIBLE, RATIOS_LIST, TIMEOUT_S ci-dessous.
+Gain v7 vs v6 :
+  - TOLERANCE 10 → 50 : ~5× plus de candidats b par valeur de a
+  - Spread adaptatif : couverture croissante sans intervention manuelle
 """
 
 import gmpy2
@@ -44,43 +42,38 @@ import multiprocessing as mp
 # ═══════════════════════════════════════════════════════════════
 DIGITS_CIBLE     = 50_000      # nombre de chiffres souhaité
 TIMEOUT_S        = 14_400      # durée max par session (14400 = 4h)
-TOLERANCE        = 10          # tolérance ±chiffres
+TOLERANCE        = 50          # tolérance ±chiffres  [v7 : 10 → 50]
 MR_TOURS         = 3           # tours Miller-Rabin rapide
 MR_TOURS_CONFIRM = 20          # confirmation avant Pocklington
 TEMOINS_MAX      = 300         # max témoins Pocklington
 SIEVE_LIMIT      = 10_000_000  # crible jusqu'à ce nombre
 RAPPORT_S        = 300         # rapport toutes les 5 min
 CHECKPOINT_S     = 60          # sauvegarde checkpoint toutes les 60s
-CHECKPOINT_FILE  = f"checkpoint_{DIGITS_CIBLE}_v6.json"
+CHECKPOINT_FILE  = f"checkpoint_{DIGITS_CIBLE}_v7.json"
 
 # ───────────────────────────────────────────────────────────────
-# [V6] RATIOS b/a — génération automatique bornée par la tolérance
+# [V7] SPREAD ADAPTATIF
 # ───────────────────────────────────────────────────────────────
-# Pour p = 3m(m+1)+1 ≈ (2^a·3^b)²  avoir D ± tol chiffres :
+# Au démarrage : N_RATIOS_INIT ratios couvrant ±SPREAD_INIT autour
+# de RATIO_CENTRE.
+# Tous les ADAPT_INTERVAL tests MR sans succès : +2 ratios (un de
+# chaque côté), jusqu'à N_RATIOS_MAX ratios sur ±SPREAD_MAX.
 #
-#   log₁₀(p) ≈ 2a·log₁₀(2) + (2b+1)·log₁₀(3)
+# Bornes absolues (déduites de D, b₀≥1, a₀≥1) :
+#   r_min = 2·log₁₀(2) / D
+#   r_max = (D/2 − log₁₀(2)) / log₁₀(3)
 #
-# Pour un ratio r = b/a, le centre (a₀, b₀) est calibré pour donner
-# exactement D chiffres :
-#   a₀ = D/2 / (log₁₀(2) + r·log₁₀(3))   b₀ = a₀·r
-#
-# Bornes valides déduites de la tolérance :
-#   r_min = 2·log₁₀(2) / D        (b₀≥1 quand a₀→a_max)
-#   r_max = (D/2 − log₁₀(2)) / log₁₀(3)   (a₀≥1 quand b₀→b_max)
-#
-# Pour chaque a du zigzag, b_valides() filtre les b tels que
-# |log₁₀(p) − D| ≤ tol — garantie inconditionnelle.
-#
-# Paramètres de génération :
-N_RATIOS      = 7       # nombre de ratios à explorer simultanément
-RATIO_CENTRE  = 1.00    # ratio central (empirique : 0.987–1.085 sur primes connus)
-RATIO_SPREAD  = 0.15    # demi-amplitude : ratios dans [CENTRE−SPREAD, CENTRE+SPREAD]
-#
-# Résultats observés :
+# Données observées (référence) :
 #   9 998 ch.  (a=6212,  b=6738)  : b/a = 1.085
 #   10 000 ch. (a=6213,  b=6740)  : b/a = 1.085
 #   19 999 ch. (a=12228, b=13242) : b/a = 1.083
 #   29 998 ch. (a=19435, b=19173) : b/a = 0.987
+RATIO_CENTRE    = 1.00   # centre de la plage (empirique)
+N_RATIOS_INIT   = 7      # ratios actifs au départ
+N_RATIOS_MAX    = 15     # ratios max après expansions complètes
+SPREAD_INIT     = 0.15   # demi-amplitude initiale  → [0.85, 1.15]
+SPREAD_MAX      = 0.35   # demi-amplitude maximale  → [0.65, 1.35]
+ADAPT_INTERVAL  = 200    # tous les N tests MR → +2 ratios
 
 # ───────────────────────────────────────────────────────────────
 # PARALLÉLISME
@@ -92,37 +85,52 @@ N_WORKERS_PARAM = 0            # 0 = auto (cpu_count - 1), >0 = valeur fixe
 LOG10_2 = math.log10(2)
 LOG10_3 = math.log10(3)
 
-# ── Bornes mathématiques des ratios valides ───────────────────────────────────
-# Pour un centre (a₀, b₀) avec b₀ = a₀·r ≥ 1 et a₀ ≥ 1 :
-_RATIO_MIN_ABSOLU = 2 * LOG10_2 / DIGITS_CIBLE          # b₀ ≥ 1 quand a₀→max
-_RATIO_MAX_ABSOLU = (DIGITS_CIBLE / 2 - LOG10_2) / LOG10_3  # a₀ ≥ 1 quand b₀→max
+_RATIO_MIN_ABSOLU = 2 * LOG10_2 / DIGITS_CIBLE
+_RATIO_MAX_ABSOLU = (DIGITS_CIBLE / 2 - LOG10_2) / LOG10_3
 
-# Génération de RATIOS_LIST : N_RATIOS valeurs régulièrement espacées dans
-# [RATIO_CENTRE − RATIO_SPREAD, RATIO_CENTRE + RATIO_SPREAD],
-# clampées aux bornes absolues et validées par b_valides.
-def _generer_ratios():
-    step = (2 * RATIO_SPREAD / (N_RATIOS - 1)) if N_RATIOS > 1 else 0
-    candidats = [
-        round(RATIO_CENTRE - RATIO_SPREAD + i * step, 4)
-        for i in range(N_RATIOS)
+# ── Génération de la liste complète des N_RATIOS_MAX ratios ──────────────────
+# Espacés régulièrement sur ±SPREAD_MAX, triés du centre vers les bords
+# afin que ratios[:n] correspondent toujours à la plage ±spread(n).
+
+def _generer_tous_ratios():
+    step = (2 * SPREAD_MAX / (N_RATIOS_MAX - 1)) if N_RATIOS_MAX > 1 else 0
+    bruts = [
+        round(RATIO_CENTRE - SPREAD_MAX + i * step, 4)
+        for i in range(N_RATIOS_MAX)
     ]
+    # Trier : centre d'abord, puis alterner gauche/droite
+    centre_idx = N_RATIOS_MAX // 2
+    ordonnes = []
+    for k in range(N_RATIOS_MAX):
+        if k % 2 == 0:
+            idx = centre_idx - k // 2
+        else:
+            idx = centre_idx + (k + 1) // 2
+        if 0 <= idx < N_RATIOS_MAX:
+            ordonnes.append(bruts[idx])
+    # Filtrer les invalides
     valides = []
-    for r in candidats:
+    for r in ordonnes:
         if r < _RATIO_MIN_ABSOLU or r > _RATIO_MAX_ABSOLU:
-            print(f"  ⚠  Ratio {r} hors bornes [{_RATIO_MIN_ABSOLU:.6f}, "
-                  f"{_RATIO_MAX_ABSOLU:.2f}] — ignoré")
             continue
         ac = max(1, int((DIGITS_CIBLE / 2) / (LOG10_2 + r * LOG10_3)))
-        bc = int(ac * r)
-        if bc < 1:
-            print(f"  ⚠  Ratio {r} → b₀={bc} < 1 — ignoré")
+        if int(ac * r) < 1:
             continue
         valides.append(r)
-    if not valides:
-        raise ValueError("Aucun ratio valide — ajuster RATIO_CENTRE ou RATIO_SPREAD.")
+    if len(valides) < N_RATIOS_INIT:
+        raise ValueError(
+            f"Seulement {len(valides)} ratios valides — "
+            f"réduire N_RATIOS_INIT ou ajuster RATIO_CENTRE/SPREAD_MAX."
+        )
     return valides
 
-RATIOS_LIST = _generer_ratios()
+TOUS_RATIOS = _generer_tous_ratios()   # liste ordonnée centre→bords
+
+def n_actifs_pour(n_mr_total):
+    """Nombre de ratios actifs en fonction du compteur MR."""
+    expansions = n_mr_total // ADAPT_INTERVAL
+    return min(N_RATIOS_MAX, N_RATIOS_INIT + 2 * expansions)
+
 
 # ── Théorème 2 — classes interdites mod 7 ────────────────────────────────────
 FORBIDDEN_T2 = frozenset({(0,2),(0,3),(1,0),(1,1),(2,4),(2,5)})
@@ -160,13 +168,6 @@ def _crible_mod(a, b):
     return True
 
 def _tester_paire(args):
-    """
-    Teste une paire (a, b) :
-      1. Théorème 2 : 7|p ?  (gratuit)
-      2. Crible modulaire q≡1(mod3)
-      3. Miller-Rabin rapide (MR_TOURS rounds)
-      4. Confirmation MR (MR_TOURS_CONFIRM rounds) avant Pocklington
-    """
     a, b, mr_tours, mr_confirm = args
 
     if (a % 3, b % 6) in _W_FORBIDDEN:
@@ -194,7 +195,7 @@ def _tester_paire(args):
 def b_valides(a, digits, tol):
     b_c = (digits / 2 - a * LOG10_2 - LOG10_3 / 2) / LOG10_3
     return [
-        b for b in range(max(1, int(b_c) - 3), int(b_c) + 4)
+        b for b in range(max(1, int(b_c) - tol - 2), int(b_c) + tol + 3)
         if abs(2 * (a * LOG10_2 + b * LOG10_3) + LOG10_3 - digits) <= tol + 2
     ]
 
@@ -249,24 +250,16 @@ def position_suivante(delta, side, centre, a_min, a_max):
             return None, None
 
 
-# ── [V6] Génération multi-ratio en round-robin ────────────────────────────────
+# ── Génération multi-ratio en round-robin ─────────────────────────────────────
 
-def generer_batch_multi(deltas, sides, centres, a_max, digits, tol, taille):
-    """
-    Génère `taille` paires en round-robin sur tous les ratios actifs.
-    Pour chaque cycle : on prend une valeur de a de chaque ratio à tour de rôle,
-    puis tous les b valides pour cet a.
-
-    Retourne (paires, new_deltas, new_sides).
-    """
+def generer_batch_multi(deltas, sides, centres, a_max, digits, tol, taille, n_actifs):
     paires     = []
-    n          = len(centres)
     new_deltas = list(deltas)
     new_sides  = list(sides)
 
     while len(paires) < taille:
         progress = False
-        for i in range(n):
+        for i in range(min(n_actifs, len(centres))):
             if new_deltas[i] is None:
                 continue
             progress = True
@@ -274,13 +267,13 @@ def generer_batch_multi(deltas, sides, centres, a_max, digits, tol, taille):
             a  = a_depuis_position(ac, new_deltas[i], new_sides[i])
             for b in b_valides(a, digits, tol):
                 paires.append((a, b, MR_TOURS, MR_TOURS_CONFIRM))
-            nd, ns         = position_suivante(new_deltas[i], new_sides[i], ac, 1, a_max)
-            new_deltas[i]  = nd
-            new_sides[i]   = ns
+            nd, ns        = position_suivante(new_deltas[i], new_sides[i], ac, 1, a_max)
+            new_deltas[i] = nd
+            new_sides[i]  = ns
             if len(paires) >= taille:
                 break
         if not progress:
-            break  # tous les ratios épuisés
+            break
 
     return paires, new_deltas, new_sides
 
@@ -290,16 +283,16 @@ def generer_batch_multi(deltas, sides, centres, a_max, digits, tol, taille):
 def sauver_checkpoint(deltas, sides, n_t2, n_crible, n_mr, n_paires, t_cumul):
     with open(CHECKPOINT_FILE, "w", encoding="utf-8") as f:
         json.dump({
-            "digits":   DIGITS_CIBLE,
-            "version":  6,
-            "ratios":   RATIOS_LIST,
-            "deltas":   [d if d is not None else -1 for d in deltas],
-            "sides":    sides,
-            "n_t2":     n_t2,
-            "n_crible": n_crible,
-            "n_mr":     n_mr,
-            "n_paires": n_paires,
-            "t_cumul":  t_cumul,
+            "digits":        DIGITS_CIBLE,
+            "version":       7,
+            "tous_ratios":   TOUS_RATIOS,
+            "deltas":        [d if d is not None else -1 for d in deltas],
+            "sides":         sides,
+            "n_t2":          n_t2,
+            "n_crible":      n_crible,
+            "n_mr":          n_mr,
+            "n_paires":      n_paires,
+            "t_cumul":       t_cumul,
         }, f, indent=2)
 
 def charger_checkpoint():
@@ -311,10 +304,10 @@ def charger_checkpoint():
         if data.get("digits") != DIGITS_CIBLE:
             print(f"  ⚠  Checkpoint ignoré (digits={data.get('digits')} ≠ {DIGITS_CIBLE})")
             return None
-        if data.get("version") != 6:
-            print(f"  ⚠  Checkpoint ignoré (version {data.get('version')} ≠ 6)")
+        if data.get("version") != 7:
+            print(f"  ⚠  Checkpoint ignoré (version {data.get('version')} ≠ 7)")
             return None
-        if data.get("ratios") != RATIOS_LIST:
+        if data.get("tous_ratios") != TOUS_RATIOS:
             print(f"  ⚠  Checkpoint ignoré (ratios différents — nouvelle recherche)")
             return None
         return data
@@ -347,59 +340,65 @@ if __name__ == '__main__':
     print(f"{len(PREMIERS):,} premiers utiles  ({time.perf_counter()-t0:.2f}s)")
     print(f"Cœurs disponibles : {n_coeurs}  →  {N_WORKERS} workers  (batch {BATCH})")
 
-    # Centres — un par ratio
+    # Centres — un par ratio (tous pré-calculés)
     a_max   = int(DIGITS_CIBLE / (2 * LOG10_2)) + 10
     centres = []
-    for r in RATIOS_LIST:
+    for r in TOUS_RATIOS:
         ac = int((DIGITS_CIBLE / 2) / (LOG10_2 + r * LOG10_3))
         bc = int(ac * r)
         centres.append((ac, bc))
 
-    N_RATIOS_ACTIFS = len(RATIOS_LIST)
+    N_TOTAL = len(TOUS_RATIOS)
 
     # État initial
     cp = charger_checkpoint()
     if cp:
         raw_deltas = cp["deltas"]
-        deltas = [None if d == -1 else d for d in raw_deltas]
-        sides  = cp["sides"]
+        deltas   = [None if d == -1 else d for d in raw_deltas]
+        sides    = cp["sides"]
         n_t2     = cp.get("n_t2", 0)
         n_crible = cp["n_crible"]
         n_mr     = cp["n_mr"]
         n_paires = cp["n_paires"]
         t_cumul  = cp["t_cumul"]
-        print(f"\n  ♻  REPRISE v6 : {sum(1 for d in deltas if d is not None)}/{N_RATIOS_ACTIFS} ratios actifs")
-        print(f"     Cumulé : {t_cumul/3600:.2f}h  |  MR : {n_mr}")
+        n_act    = n_actifs_pour(n_mr)
+        print(f"\n  ♻  REPRISE v7 : {n_act}/{N_TOTAL} ratios actifs  |  "
+              f"MR={n_mr}  cumulé={t_cumul/3600:.2f}h")
     else:
-        deltas   = [0] * N_RATIOS_ACTIFS
-        sides    = [0] * N_RATIOS_ACTIFS
+        deltas   = [0] * N_TOTAL
+        sides    = [0] * N_TOTAL
         n_t2 = n_crible = n_mr = n_paires = 0
         t_cumul = 0.0
-        print(f"\n  Nouvelle recherche v6 (aucun checkpoint)")
+        n_act   = N_RATIOS_INIT
+        print(f"\n  Nouvelle recherche v7 (aucun checkpoint)")
 
-    print(f"\n{'═'*70}")
-    print(f"  PrimeQuest v6 — p = 3m(m+1)+1,  m = 2^a·3^b−1")
-    print(f"{'═'*70}")
-    print(f"  Cible          : {DIGITS_CIBLE:,} chiffres (±{TOLERANCE})")
-    print(f"  Bornes ratios  : [{_RATIO_MIN_ABSOLU:.6f},  {_RATIO_MAX_ABSOLU:.2f}]  "
-          f"(contraintes D={DIGITS_CIBLE}, b₀≥1, a₀≥1)")
-    print(f"  Plage choisie  : [{RATIO_CENTRE-RATIO_SPREAD:.3f},  {RATIO_CENTRE+RATIO_SPREAD:.3f}]"
-          f"  (centre={RATIO_CENTRE} ± {RATIO_SPREAD})")
-    print(f"  Ratios actifs  : {RATIOS_LIST}")
-    print(f"  Centres (a₀,b₀): {centres}")
-    print(f"  a_max          : {a_max:,}")
-    print(f"  Workers        : {N_WORKERS}  (batch {BATCH} paires)")
-    print(f"  Crible         : {len(PREMIERS):,} premiers q≡1(mod3) ≤ {SIEVE_LIMIT:,}")
-    print(f"  Théorème 2     : {len(FORBIDDEN_T2)}/18 classes (a%3,b%6) filtrées (~33%)")
-    print(f"  MR rounds      : {MR_TOURS} (filtre) + {MR_TOURS_CONFIRM} (confirmation)")
-    print(f"  Timeout        : {TIMEOUT_S:,}s ({TIMEOUT_S/3600:.1f}h)")
-    print(f"  Checkpoint     : toutes les {CHECKPOINT_S}s → {CHECKPOINT_FILE}")
-    print(f"{'─'*70}\n")
+    print(f"\n{'═'*72}")
+    print(f"  PrimeQuest v7 — p = 3m(m+1)+1,  m = 2^a·3^b−1")
+    print(f"{'═'*72}")
+    print(f"  Cible           : {DIGITS_CIBLE:,} chiffres  (tolérance ±{TOLERANCE})")
+    print(f"  Bornes ratios   : [{_RATIO_MIN_ABSOLU:.6f},  {_RATIO_MAX_ABSOLU:.2f}]")
+    print(f"  Spread initial  : ±{SPREAD_INIT}  ({N_RATIOS_INIT} ratios)  →"
+          f"  [{RATIO_CENTRE-SPREAD_INIT:.3f}, {RATIO_CENTRE+SPREAD_INIT:.3f}]")
+    print(f"  Spread max      : ±{SPREAD_MAX}  ({N_RATIOS_MAX} ratios)  →"
+          f"  [{RATIO_CENTRE-SPREAD_MAX:.3f}, {RATIO_CENTRE+SPREAD_MAX:.3f}]")
+    print(f"  Expansion       : +2 ratios tous les {ADAPT_INTERVAL} tests MR")
+    print(f"  Ratios (tous)   : {TOUS_RATIOS}")
+    print(f"  Ratios actifs   : {TOUS_RATIOS[:n_act]}  ({n_act}/{N_TOTAL})")
+    print(f"  Centres (a₀)    : {[c[0] for c in centres[:n_act]]}")
+    print(f"  a_max           : {a_max:,}")
+    print(f"  Workers         : {N_WORKERS}  (batch {BATCH} paires)")
+    print(f"  Crible          : {len(PREMIERS):,} premiers q≡1(mod3) ≤ {SIEVE_LIMIT:,}")
+    print(f"  Théorème 2      : {len(FORBIDDEN_T2)}/18 classes filtrées (~33%)")
+    print(f"  MR rounds       : {MR_TOURS} + {MR_TOURS_CONFIRM}")
+    print(f"  Timeout         : {TIMEOUT_S:,}s ({TIMEOUT_S/3600:.1f}h)")
+    print(f"  Checkpoint      : toutes les {CHECKPOINT_S}s → {CHECKPOINT_FILE}")
+    print(f"{'─'*72}\n")
 
     trouve    = None
     t_debut   = time.perf_counter()
     t_rapport = t_debut
     t_ckpt    = t_debut
+    n_act_prec = n_act
 
     def _handler(sig, frame):
         print(f"\n  ⚡ Interruption — sauvegarde…", flush=True)
@@ -415,11 +414,19 @@ if __name__ == '__main__':
                  initializer=_init_worker,
                  initargs=(PREMIERS, FORBIDDEN_T2)) as pool:
 
-        while any(d is not None for d in deltas):
+        while any(d is not None for d in deltas[:n_act]):
 
             now           = time.perf_counter()
             elapsed_s     = now - t_debut
             elapsed_total = t_cumul + elapsed_s
+
+            # Vérifier expansion spread
+            n_act = n_actifs_pour(n_mr)
+            if n_act > n_act_prec:
+                nouveaux = TOUS_RATIOS[n_act_prec:n_act]
+                print(f"\n  ↗  EXPANSION spread : {n_act_prec}→{n_act} ratios  "
+                      f"(+{nouveaux})  après {n_mr} tests MR", flush=True)
+                n_act_prec = n_act
 
             if elapsed_s >= TIMEOUT_S:
                 print(f"\n  ⏱  Timeout {TIMEOUT_S/3600:.1f}h atteint.")
@@ -434,13 +441,15 @@ if __name__ == '__main__':
                 t_ckpt = now
 
             if now - t_rapport >= RAPPORT_S:
-                restant   = max(0, TIMEOUT_S - elapsed_s)
-                taux      = elapsed_s / max(n_mr, 1)
-                elim_tot  = n_t2 + n_crible
-                actifs    = sum(1 for d in deltas if d is not None)
+                restant  = max(0, TIMEOUT_S - elapsed_s)
+                taux     = elapsed_s / max(n_mr, 1)
+                elim_tot = n_t2 + n_crible
+                spread_c = SPREAD_INIT + (n_mr // ADAPT_INTERVAL) * (
+                    (SPREAD_MAX - SPREAD_INIT) / max(1, (N_RATIOS_MAX - N_RATIOS_INIT) // 2)
+                )
                 print(
                     f"  [{elapsed_total/3600:5.2f}h]  "
-                    f"ratios_actifs={actifs}/{N_RATIOS_ACTIFS}  "
+                    f"ratios={n_act}/{N_TOTAL}  spread=±{min(spread_c, SPREAD_MAX):.3f}  "
                     f"paires={n_paires:,}  T2={n_t2:,}  crible={n_crible:,}  "
                     f"MR={n_mr}  élim={elim_tot/max(n_paires,1)*100:.1f}%  "
                     f"~{taux:.0f}s/MR  restant={restant/60:.0f}min",
@@ -450,7 +459,7 @@ if __name__ == '__main__':
 
             batch, deltas, sides = generer_batch_multi(
                 deltas, sides, centres, a_max,
-                DIGITS_CIBLE, TOLERANCE, BATCH
+                DIGITS_CIBLE, TOLERANCE, BATCH, n_act
             )
             if not batch:
                 break
@@ -461,10 +470,8 @@ if __name__ == '__main__':
                 n_paires += 1
                 if r['statut'] == 'theoreme2':
                     n_t2 += 1
-
                 elif r['statut'] == 'crible':
                     n_crible += 1
-
                 elif r['statut'] == 'compose':
                     n_mr += 1
                     now2    = time.perf_counter()
@@ -477,7 +484,6 @@ if __name__ == '__main__':
                         f"(restant {restant/60:.0f}min)  → composé",
                         flush=True
                     )
-
                 elif r['statut'] == 'probable':
                     n_mr += 1
                     now2    = time.perf_counter()
@@ -506,7 +512,7 @@ if __name__ == '__main__':
     t_session = time.perf_counter() - t_debut
     t_total   = t_cumul + t_session
 
-    print(f"\n{'═'*70}")
+    print(f"\n{'═'*72}")
 
     if trouve:
         supprimer_checkpoint()
@@ -518,7 +524,7 @@ if __name__ == '__main__':
         ratio_r = b / a
 
         print(f"  PREMIER DE {nb} CHIFFRES — PRIMALITÉ PROUVÉE ✅")
-        print(f"{'═'*70}")
+        print(f"{'═'*72}")
         print(f"""
   Structure
   ──────────────────────────────────────────────────────
@@ -541,39 +547,41 @@ if __name__ == '__main__':
   Éliminés crible    : {n_crible}  ({n_crible/max(n_paires,1)*100:.1f}%)
   Total éliminés     : {n_t2+n_crible}  ({(n_t2+n_crible)/max(n_paires,1)*100:.1f}%)
   Workers parallèles : {N_WORKERS}
-  Ratios explorés    : {RATIOS_LIST}
+  Tolérance          : ±{TOLERANCE} chiffres
+  Ratios actifs      : {TOUS_RATIOS[:n_act]}
 
   p = {sp[:40]}…{sp[-20:]}
 """)
-        nom = f"premier_{nb}chiffres_v6.txt"
+        nom = f"premier_{nb}chiffres_v7.txt"
         with open(nom, "w", encoding="utf-8") as f:
-            f.write(f"Premier de {nb} chiffres — PrimeQuest v6\n")
+            f.write(f"Premier de {nb} chiffres — PrimeQuest v7\n")
             f.write(f"a={a}, b={b}  (ratio b/a={ratio_r:.4f})\n")
             f.write(f"Témoins : q=2→w={temoins[2]}, q=3→w={temoins[3]}\n")
             f.write(f"Temps   : {t_total:.1f}s  ({t_total/3600:.2f}h)\n")
             f.write(f"Workers : {N_WORKERS}\n")
-            f.write(f"Ratios  : {RATIOS_LIST}\n\nm =\n{m}\n\np =\n{p}\n")
+            f.write(f"Tolérance : ±{TOLERANCE} chiffres\n")
+            f.write(f"Ratios  : {TOUS_RATIOS[:n_act]}\n\nm =\n{m}\n\np =\n{p}\n")
         print(f"  Sauvegardé → {nom}")
 
-    elif not any(d is not None for d in deltas):
+    elif not any(d is not None for d in deltas[:n_act]):
         supprimer_checkpoint()
-        print("  Espace (a,b) entièrement exploré — augmenter TOLERANCE.")
+        print("  Espace (a,b) entièrement exploré — augmenter TOLERANCE ou SPREAD_MAX.")
 
     else:
         elim_tot = n_t2 + n_crible
         tps_mr   = t_session / max(n_mr, 1)
-        actifs   = sum(1 for d in deltas if d is not None)
         print(f"  COMPTE RENDU — Session terminée (relancer pour continuer)")
-        print(f"{'═'*70}")
+        print(f"{'═'*72}")
         print(f"""
   Temps session           : {t_session/3600:.2f}h
   Temps total cumulé      : {t_total/3600:.2f}h
-  Ratios actifs           : {actifs}/{N_RATIOS_ACTIFS}
+  Ratios actifs           : {n_act}/{N_TOTAL}
   Paires testées          : {n_paires:,}
   Filtrées Théorème 2     : {n_t2:,}  ({n_t2/max(n_paires,1)*100:.1f}%)
   Éliminées crible        : {n_crible:,}  ({n_crible/max(n_paires,1)*100:.1f}%)
   Total éliminées         : {elim_tot:,}  ({elim_tot/max(n_paires,1)*100:.1f}%)
   Tests MR                : {n_mr}
   Temps/MR effectif       : {tps_mr:.1f}s  (÷ {N_WORKERS} workers)
+  Tolérance               : ±{TOLERANCE} chiffres
   Checkpoint              : {CHECKPOINT_FILE} ✅
 """)
