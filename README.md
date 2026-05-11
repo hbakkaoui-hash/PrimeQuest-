@@ -1,43 +1,75 @@
-# PrimeQuest — Deux papiers sur les nombres premiers
+# PrimeQuest — Recherche en théorie des nombres premiers
 
-Dépôt de recherche de Hassane BAKKAOUI.
+**Auteur :** Hassane Bakkaoui — Chercheur indépendant  
+**Période :** Avril – Mai 2026
 
-## Structure
+Dépôt de recherche contenant quatre papiers sur les nombres premiers paramétriques,
+la distribution de $q_{\min}$, et les certificats de primalité.
+
+---
+
+## Structure du dépôt
 
 ```
 PrimeQuest-/
-├── paper1-qmin-bh/          — Papier I  : famille paramétrique & constante BH
-└── paper2-pocklington-primes/ — Papier II : primes de Pocklington p=3m(m+1)+1
+├── paper1-qmin-bh/                  Papier I  — Famille paramétrique & constante BH
+├── paper2-prime-families/           Papier II — Loi conditionnelle & connexion ζ(s)
+├── paper3-padic-qmin/               Papier III — Distribution p-adique de q_min
+└── paper4-pocklington-certificates/ Papier IV — Certificats de primalité Pocklington
 ```
 
 ---
 
-## Papier I — Famille paramétrique de premiers & analyse BH
+## Papier I — Famille paramétrique de premiers & analyse Bateman–Horn
 
-**Dossier :** `paper1-qmin-bh/`
+**Dossier :** [`paper1-qmin-bh/`](paper1-qmin-bh/)  
+**MSC :** 11N13 · 11Y11 · 11N32
 
-Étude de la distribution de q_min dans une famille paramétrique de nombres
-premiers, et vérification numérique de la conjecture de Bateman-Horn.
-
-- `tex/main.tex`                  — source LaTeX
-- `Parametric_Family_of_Primes.pdf` — article complet (PDF)
-- `code/`                         — scripts Python d'analyse
-- `data/TABLE_full_subsample_10e8.csv` — données numériques
+Étude de la loi marginale du décalage minimal $q_{\min}$ dans la famille paramétrée
+$p = km(m+1) + \varepsilon + 2kq$, et vérification numérique de la conjecture
+de Bateman–Horn. Résultat principal : $\mathbb{E}[|q_{\min}|] \sim \log m / C_k$.
 
 ---
 
-## Papier II — Primes de Pocklington : p = 3m(m+1)+1, m = 2^a·3^b−1
+## Papier II — Loi conditionnelle & exclusion de la connexion spectrale
 
-**Dossier :** `paper2-pocklington-primes/`
+**Dossier :** [`paper2-prime-families/`](paper2-prime-families/)  
+**MSC :** 11N13 · 11M41 · 11Y11
 
-Construction, preuve de primalité (Théorème de Pocklington N-1) et analyse
-arithmétique d'une famille de grands nombres premiers.
+Loi conditionnelle $\mathbb{E}[|q| \mid m] = m/4$ et réfutation de la connexion
+spurieuse à $\zeta(s)$. Analyse de la couche spectrale de la famille.
 
-- `tex/paper_II_revised.tex`      — source LaTeX
-- `code/primequest.py`            — PrimeQuest v3 (multi-cœurs, ARM64)
-- `data/`                         — certificats de primalité produits
-- Théorèmes prouvés : p≡1(mod 6), classes interdites mod 7, q≡1(mod 3)
-- Résultat : premier de **19 999 chiffres** prouvé sur PC ordinaire
+---
+
+## Papier III — Distribution $p$-adique de $q_{\min}$ : phénomène d'anti-persistance
+
+**Dossier :** [`paper3-padic-qmin/`](paper3-padic-qmin/)  
+**MSC :** 11N32 · 11N13 · 11M41 · 62P99
+
+Distribution jointe modulaire de $q_{\min} \bmod \ell$ pour les petits premiers $\ell$.
+Théorèmes conditionnel et inconditionnel sur la fréquence de permission $\Pi_P$.
+Découverte d'un **phénomène d'anti-persistance** : inversion de signe de l'autocorrélation
+lag-1 à un seuil $k_0 \approx 8.4$, avec loi linéaire $\mathrm{ACF}_1 \approx 0.024k - 0.20$
+($R^2 = 0.97$).
+
+---
+
+## Papier IV — Certificats de primalité inconditionnels : $p = 3m(m+1)+1$
+
+**Dossier :** [`paper4-pocklington-certificates/`](paper4-pocklington-certificates/)  
+**MSC :** 11A41 · 11Y11 · 11N13
+
+Certification inconditionnelle (Théorème de Pocklington N−1) de la sous-famille
+$m = 2^a \cdot 3^b - 1$. Trois filtres arithmétiques éliminent **87,1 %** des candidats.
+Algorithme multi-cœurs PrimeQuest v1–v7. Record actuel : premier de **29 998 chiffres**
+(3 h 06 min, 9 workers, ARM64).
+
+| Chiffres | a | b | Temps | Workers |
+|---------:|--:|--:|------:|--------:|
+| 9 998 | 6 212 | 6 738 | — | 1 |
+| 10 000 | 6 213 | 6 740 | — | 1 |
+| 19 999 | 12 228 | 13 242 | 2 h 40 min | 9 |
+| **29 998** | **19 435** | **19 173** | **3 h 06 min** | **9** |
 
 ---
 
@@ -47,4 +79,5 @@ arithmétique d'une famille de grands nombres premiers.
 pip install gmpy2 matplotlib pandas
 ```
 
-ARM64 (Snapdragon / Apple Silicon) : utiliser Python natif ARM64.
+Python ≥ 3.9, gmpy2 ≥ 2.1 (backend GMP).  
+ARM64 (Snapdragon / Apple Silicon) : utiliser Python natif ARM64 pour performances optimales.
