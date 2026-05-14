@@ -1,0 +1,42 @@
+Premier de 29 998 chiffres — PrimeQuest v4
+==========================================
+
+Famille paramétrique
+────────────────────
+  p = 3·m·(m+1) + 1,   m = 2^a · 3^b − 1
+
+  a = 19 435
+  b = 19 173   (ratio b/a = 0.9865)
+
+  m  =  2^19435 · 3^19173 − 1      (14 999 chiffres)
+  p  =  3·m·(m+1) + 1              (29 998 chiffres)
+
+Certificat de primalité — méthode Pocklington (N−1)
+────────────────────────────────────────────────────
+  p − 1  =  2^19435 · 3^19174 · (2^19435 · 3^19173 − 1)
+           ╰──────────────────╯
+                   F   (facteur connu, 15 000 chiffres)
+
+  Condition Pocklington : F > √p  ✅
+    car F² ≈ 2^38870 · 3^38348  >  p ≈ 3 · (2^19435 · 3^19173)²
+
+  Témoins (Théorème de Pocklington) :
+    q = 2  →  w = 5 :   5^(p−1) ≡ 1 (mod p)  et  gcd(5^((p−1)/2)−1, p) = 1  ✅
+    q = 3  →  w = 7 :   7^(p−1) ≡ 1 (mod p)  et  gcd(7^((p−1)/3)−1, p) = 1  ✅
+
+  Conclusion : p est un nombre premier (preuve déterministe).
+
+Performance — PrimeQuest v4
+────────────────────────────
+  Script   : PrimeQuest v4 (primequest_v4.py)
+  Machine  : Dell Inspiron 14 Plus 7441 — Snapdragon X Plus (ARM64, 10 cœurs Oryon)
+  Workers  : 9 (parallèles)
+  Temps    : 11 146.2 s  (3 h 06 min)
+
+  Tests Miller-Rabin     :    286
+  Filtrés Théorème 2     :    740   (33.3 %)   — 7 | p impossible si (a%3,b%6) interdit
+  Éliminés crible mod    :  1 195   (53.8 %)   — petits facteurs premiers ≡ 1 (mod 3)
+  Total éliminés (sans MR):  1 935   (87.1 %)
+
+p = 1602087359509060348500037851549319056715…16930852697403293697
+m = 2310907007727384623285933413944216807745…50113020565115633663
