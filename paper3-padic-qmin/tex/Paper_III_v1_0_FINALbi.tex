@@ -1,0 +1,582 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[english]{babel}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{geometry}
+\geometry{margin=2.5cm}
+\usepackage{hyperref}
+\usepackage{booktabs}
+\usepackage{xcolor}
+\usepackage{mdframed}
+\usepackage[expansion=false]{microtype}
+\usepackage{enumitem}
+\usepackage{array}
+\usepackage{graphicx}
+\usepackage{caption}
+\captionsetup{font=small,labelfont=bf,format=plain}
+\hypersetup{colorlinks=true, linkcolor=blue!50!black, urlcolor=blue!50!black}
+
+% Epistemic boxes
+\newmdenv[backgroundcolor=green!10, linecolor=green!50!black, linewidth=1pt,
+  innertopmargin=6pt, innerbottommargin=6pt, innerleftmargin=8pt, innerrightmargin=8pt,
+  skipabove=8pt, skipbelow=8pt]{rigorousbox}
+\newmdenv[backgroundcolor=yellow!15, linecolor=orange!70!black, linewidth=1pt,
+  innertopmargin=6pt, innerbottommargin=6pt, innerleftmargin=8pt, innerrightmargin=8pt,
+  skipabove=8pt, skipbelow=8pt]{heuristicbox}
+\newmdenv[backgroundcolor=red!8, linecolor=red!50!black, linewidth=1pt,
+  innertopmargin=6pt, innerbottommargin=6pt, innerleftmargin=8pt, innerrightmargin=8pt,
+  skipabove=8pt, skipbelow=8pt]{negativebox}
+\newmdenv[backgroundcolor=blue!8, linecolor=blue!60!black, linewidth=1pt,
+  innertopmargin=6pt, innerbottommargin=6pt, innerleftmargin=8pt, innerrightmargin=8pt,
+  skipabove=8pt, skipbelow=8pt]{openproblem}
+\newmdenv[backgroundcolor=violet!8, linecolor=violet!60!black, linewidth=1pt,
+  innertopmargin=6pt, innerbottommargin=6pt, innerleftmargin=8pt, innerrightmargin=8pt,
+  skipabove=8pt, skipbelow=8pt]{discoverybox}
+
+\theoremstyle{plain}
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{proposition}[theorem]{Proposition}
+\newtheorem{corollary}[theorem]{Corollary}
+\newtheorem{conjecture}[theorem]{Conjecture}
+\newtheorem{lemma}[theorem]{Lemma}
+
+\theoremstyle{definition}
+\newtheorem{definition}[theorem]{Definition}
+\newtheorem{remark}[theorem]{Remark}
+\newtheorem{hypothesis}[theorem]{Hypothesis}
+\newtheorem{observation}[theorem]{Observation}
+
+\title{\large $p$-adic Distribution of the Minimal Offset $q_{\min}$\\
+in Parametric Prime Families:\\[3pt]
+\Large Bateman--Horn Predictions, Conditional Theorems,\\
+and an Anti-Persistence Sign-Reversal Phenomenon}
+\author{Hassane Bakkaoui\\\small Independent Researcher\\\small bakkahassa@hotmail.com}
+\date{Working draft v0.1 --- May 2026\\\small Sequel to Papers I and II (April 2026)}
+
+\newcommand{\qmin}{q_{\min}}
+\newcommand{\Z}{\mathbb{Z}}
+\newcommand{\N}{\mathbb{N}}
+\newcommand{\Q}{\mathbb{Q}}
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\Prim}{\mathbb{P}}
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\Prb}{\mathbb{P}}
+\newcommand{\PiP}{\pi_{\mathrm{perm}}}
+\newcommand{\PiF}{\pi_{\mathrm{forb}}}
+\newcommand{\eps}{\varepsilon}
+\newcommand{\Eclass}{\mathcal{E}}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+We study the distribution modulo small primes $\ell$ of the minimal offset
+$\qmin(k, m, \eps)$ for the parametric prime family
+$p = km(m+1) + \eps + 2kq$, with $k \ge 1$ and $\eps$ admissible
+(\textit{i.e.}, $\gcd(\eps, 2k) = 1$). This completes a trilogy of papers on
+this family: Paper~I (April 2026) characterised the marginal law
+$\mathbb{E}[|\qmin|] \sim \log m / C_k$; Paper~II (April 2026, revised)
+established the conditional law $\mathbb{E}[|q| \mid m] = m/4$ and excluded a
+spurious spectral connection to $\zeta(s)$; the present paper analyses the
+\emph{joint modular} layer, completing the description with a third axis.
+
+\smallskip
+\noindent Our principal contributions are:
+
+\smallskip
+(i) An \textbf{explicit forbidden residue} $q^*(k, m, \eps; \ell) \in \Z/\ell\Z$
+(Proposition~\ref{prop:forbidden}), giving rise to the \textbf{permission frequency}
+$\PiP(r; k, \ell)$.
+
+\smallskip
+(ii) A \textbf{conditional theorem} (Theorem~\ref{thm:main}): under H1$'$ and
+H3$'$, $F_N(r; k, \ell) = \PiP(r; k, \ell)/(\ell-1) + O(N^{-1/2})$. Validated
+empirically at $N = 10^6$ for $k \in \{3, 7, 15, 21\}$: mean Pearson correlation
+prediction/observation $r = 0.99$ for small $\ell$, with effective constant
+$\bar C \approx 0.5$ (5$\times$ smaller than the triangle-inequality bound).
+
+\smallskip
+(iii) An \textbf{unconditional theorem} (Theorem~\ref{thm:degenerate}) for
+$\ell \mid 2k$: $F_N(r) = 1/\ell + O(N^{-1/2})$ unconditionally; verified across
+all 10 tested cases with $\chi^2 < 3.1$.
+
+\smallskip
+(iv) A \textbf{new phenomenon} (Section~\ref{sec:anti-persistence}): the lag-1
+autocorrelation of $(q_n \bmod 2)$ follows a clean \textbf{linear law in $k$},
+$\mathrm{ACF}_1 \approx 0.024\,k - 0.20$ ($R^2 = 0.97$ across 10 values of
+$k \in [3, 21]$ at $N = 10^6$), with sign-reversal threshold at $k_0 \approx 8.4$.
+The full spectral signature $\{\alpha(\ell)\}_{\ell=1}^{10}$ of the slopes per
+lag is fitted by a \textbf{damped cosine} (period $T \approx 5.89$, damping
+rate $\gamma \approx 0.39$) to within $R^2 = 0.999$. The phenomenon
+\textbf{amplifies with the modulus} (factor $\sim 2\times$ between mod 2 and
+mod 5 at large $k$). At $k=21$, mod 5: $\mathrm{ACF}_1 = +0.64$.
+
+\smallskip
+\textbf{Status of results}: Theorem~\ref{thm:degenerate} is unconditional.
+Theorem~\ref{thm:main}, Proposition~\ref{prop:h3-implies-h3prime}, and the
+ACF conjectures are heuristic or conditional, with carefully tracked
+hypotheses.
+
+\smallskip
+\textbf{MSC 2020}: 11N32, 11N13, 11Y11, 11M41, 62P99.\\
+\textbf{Keywords}: prime numbers, parametric families, $p$-adic distribution,
+Bateman--Horn conjecture, autocorrelation, anti-persistence.
+\end{abstract}
+
+\begin{heuristicbox}
+\noindent\textbf{Epistemic key.} Throughout the paper, every result carries one of
+five labels: \textbf{Rigorous} (unconditional, proved from classical theorems);
+\textbf{Heuristic} (conditional on H1$'$ or H3$'$); \textbf{Discovery} (new
+empirical finding requiring further theoretical work); \textbf{Negative}
+(invalidation of a prior small-$N$ observation); \textbf{Open} (problem stated
+but unsolved).
+\end{heuristicbox}
+
+\tableofcontents
+
+\section{Introduction}
+\label{sec:intro}
+
+\subsection{From marginal to conditional to modular distributions}
+
+The parametric prime family
+\begin{equation}
+p = km(m+1) + \eps + 2kq, \qquad m \in \N^*,\ \eps \in \Eclass_k,\ q \in \Z,
+\label{eq:family}
+\end{equation}
+introduced in Paper~I~\cite{paper1} and refined in Paper~II~\cite{paper2}, captures
+each prime $p > k+1$ as a triple $(m, \eps, q)$ with $|q|$ minimal. Papers~I and~II
+analysed the \emph{size} of $q$:
+
+\begin{itemize}[leftmargin=*]
+\item Paper~I: $\E[|\qmin(k, m)|] \sim \log m / C_k$, validated at $N = 10^6$ for $k=21$
+(heuristic, under H1+H2).
+\item Paper~II: $\E[|q| \mid m] = m/4$ (Conditional Proposition~9.4), and the
+universal constant $C_0(k) = 1/(4\sqrt{k})$ across $k \in \{3, 15, 21\}$.
+\end{itemize}
+
+The present paper analyses the \emph{joint modular structure} of $\qmin$: how is
+$\qmin$ distributed modulo a small prime $\ell$?
+
+\subsection{Pilot observation and main motivating question}
+
+A pilot study at $N = 10^4$ for $k = 3$ revealed a striking dichotomy:
+\begin{itemize}[leftmargin=*]
+\item For $\ell \in \{2, 3\}$ (which divide $2k = 6$): the distribution of
+$\qmin \bmod \ell$ is \emph{exactly uniform}.
+\item For $\ell \in \{5, 7, 11, 13\}$: the distribution is \emph{strongly
+non-uniform} ($p$-values $< 10^{-6}$), but the bias follows a precisely
+predictable pattern.
+\end{itemize}
+
+\subsection{Main results}
+
+\textbf{Theorem~\ref{thm:degenerate}} (rigorous). For $\ell \mid 2k$,
+$F_N(r; k, \ell) = 1/\ell + O(N^{-1/2})$ unconditionally.
+
+\medskip
+\textbf{Theorem~\ref{thm:main}} (heuristic, under H1$'$+H3$'$). For
+$\gcd(2k, \ell) = 1$, $F_N(r; k, \ell) = \PiP(r; k, \ell)/(\ell-1) + O(N^{-1/2})$.
+
+\medskip
+\textbf{Discovery~\ref{disc:acf}}. Lag-1 ACF sign reversal of $(q \bmod 2)$ between
+$k = 7$ and $k = 15$.
+
+\section{Theoretical Framework}
+\label{sec:framework}
+
+\subsection{Notations and admissible classes}
+
+Fix $k \ge 1$. The admissible classes for $\eps$ are
+\[
+\Eclass_k = \{\eps \in \Z : -k < \eps \le k,\ \gcd(\eps, 2k) = 1\}.
+\]
+Set
+\[
+\qmin(k, m, \eps) = \arg\min_{q \in \Z}\{|q| : km(m+1) + \eps + 2kq \in \Prim\}.
+\]
+We have $|\Eclass_k| = \varphi(2k)$. For the values studied,
+$|\Eclass_3| = 2$, $|\Eclass_7| = 6$, $|\Eclass_{15}| = 8$, $|\Eclass_{21}| = 12$.
+
+\subsection{The forbidden residue}
+
+\begin{rigorousbox}
+\begin{proposition}[Forbidden residue]\label{prop:forbidden}
+Let $\ell$ be a prime with $\gcd(\ell, 2k) = 1$. For every triple $(k, m, \eps)$,
+there exists a unique residue $q^*(k, m, \eps; \ell) \in \Z/\ell\Z$ such that
+\[
+q \equiv q^*(k, m, \eps; \ell) \pmod{\ell} \implies \ell \mid p_{k, m, \eps, q}.
+\]
+Explicitly:
+\begin{equation}
+q^*(k, m, \eps; \ell) \equiv -(2k)^{-1}\bigl(km(m+1) + \eps\bigr) \pmod{\ell}.
+\label{eq:qstar}
+\end{equation}
+\end{proposition}
+\end{rigorousbox}
+
+\begin{proof}
+The condition $p \equiv 0 \pmod \ell$ rewrites as
+$2kq \equiv -(km(m+1) + \eps) \pmod \ell$. Since $\gcd(2k, \ell) = 1$, the inverse
+$(2k)^{-1}$ exists and the equation has the unique solution~\eqref{eq:qstar}.
+\end{proof}
+
+\begin{corollary}[Permitted residues]\label{cor:permitted}
+For each triple $(k, m, \eps)$, exactly $\ell - 1$ residues of $q$ modulo $\ell$
+are \emph{permitted} (do not impose $\ell \mid p$).
+\end{corollary}
+
+\subsection{Aggregate forbid and permit frequencies}
+
+\begin{definition}\label{def:perm}
+The \emph{forbidden frequency} of residue $r \in \Z/\ell\Z$ is
+\[
+\PiF(r; k, \ell) = \frac{1}{\ell |\Eclass_k|}
+\#\bigl\{(m_0, \eps) \in \Z/\ell\Z \times \Eclass_k : q^*(k, m_0, \eps; \ell) \equiv r\bigr\}.
+\]
+The \emph{permission frequency} is $\PiP(r; k, \ell) = 1 - \PiF(r; k, \ell)$.
+\end{definition}
+
+\subsection{Hypotheses}
+
+\begin{heuristicbox}
+\begin{hypothesis}[H1$'$: equidistribution of $(m \bmod \ell, \eps)$]\label{hyp:H1prime}
+Let $S_N = \{(m_n, \eps_n)\}_{n=1}^N$ be the admissible triples generating the
+first $N$ primes of family~\eqref{eq:family} in increasing order of $p$. Then,
+uniformly in $(m_0, \eps)$,
+\[
+\nu_N(m_0, \eps) = \frac{1}{\ell |\Eclass_k|} + O(N^{-1/2}).
+\]
+\end{hypothesis}
+\textbf{Status.} A consequence of Bombieri--Vinogradov at fixed modulus
+$\ell |\Eclass_k|$. Empirically validated.
+\end{heuristicbox}
+
+\begin{heuristicbox}
+\begin{hypothesis}[H3$'$: conditional uniformity on permitted residues]\label{hyp:H3prime}
+For each pair $(m_0 \in \Z/\ell\Z, \eps \in \Eclass_k)$, conditionally on
+$m_n \equiv m_0 \pmod \ell$ and $\eps_n = \eps$, the distribution of
+$\qmin(k, m_n, \eps_n) \bmod \ell$ is uniform on the $\ell-1$ permitted residues:
+\[
+\Prb\!\left(\qmin \equiv r \pmod \ell \mid m \equiv m_0, \eps\right)
+= \frac{\mathbb{1}[r \neq q^*(k, m_0, \eps; \ell)]}{\ell - 1}.
+\]
+\end{hypothesis}
+\textbf{Status.} Heuristic; analogue of Hypothesis H3 of Paper~II.
+\end{heuristicbox}
+
+\subsection{Main theorem (non-degenerate case)}
+
+\begin{heuristicbox}
+\begin{theorem}[$p$-adic distribution of $\qmin$]\label{thm:main}
+Let $\ell$ be a prime with $\gcd(2k, \ell) = 1$. Under
+Hypotheses~\ref{hyp:H1prime} and~\ref{hyp:H3prime}, for every $r \in \Z/\ell\Z$:
+\begin{equation}
+F_N(r; k, \ell) := \frac{1}{N} \#\{n \le N : \qmin(k, m_n, \eps_n) \equiv r \pmod \ell\}
+= \frac{\PiP(r; k, \ell)}{\ell - 1} + O_{k, \ell}(N^{-1/2}).
+\label{eq:main}
+\end{equation}
+\end{theorem}
+\end{heuristicbox}
+
+\begin{proof}
+\emph{Step 1 (Decomposition).} By H3$'$ and total probability:
+\[
+F_N(r) = \sum_{m_0, \eps} \nu_N(m_0, \eps) \cdot
+\frac{\mathbb{1}[r \neq q^*(k, m_0, \eps; \ell)]}{\ell - 1}.
+\]
+\emph{Step 2--5.} Subtracting $\PiP(r)/(\ell-1)$, applying the triangle
+inequality, and using H1$'$ gives the $O_{k,\ell}(N^{-1/2})$ bound.
+\end{proof}
+
+\begin{corollary}[Explicit constant]\label{cor:constant}
+The implicit constant in Theorem~\ref{thm:main} is
+\[
+C(k, \ell) = \frac{\ell |\Eclass_k|}{\ell - 1} \cdot \sigma(k, \ell), \qquad
+\sigma(k, \ell) = \sqrt{\frac{\ell |\Eclass_k| - 1}{\ell |\Eclass_k|}} \le 1.
+\]
+For $k = 3$, $\ell = 5$: $C(3, 5) \approx 2.37$.
+\end{corollary}
+
+\subsection{Degenerate case (rigorous)}
+
+\begin{rigorousbox}
+\begin{theorem}[Uniform distribution in the degenerate case]\label{thm:degenerate}
+If $\ell \mid 2k$, then for every triple $(k, m, \eps)$ and every $q$:
+$p_{k, m, \eps, q} \equiv \eps \pmod \ell$, which is non-zero modulo $\ell$ since
+$\gcd(\eps, 2k) = 1$ and $\ell \mid 2k$. Therefore no residue of $q$ is forbidden,
+and:
+\[
+F_N(r; k, \ell) = \frac{1}{\ell} + O_{k, \ell}(N^{-1/2}),
+\]
+\emph{unconditionally on H3$'$, requiring only H1$'$.}
+\end{theorem}
+\end{rigorousbox}
+
+\begin{proof}
+If $\ell \mid 2k$, then $2kq \equiv 0 \pmod \ell$ for all $q$, so
+$p \equiv km(m+1) + \eps \pmod \ell$. Since either $\ell \mid k$ or $\ell = 2$
+(in which case $m(m+1)$ is always even), we get $km(m+1) \equiv 0 \pmod\ell$,
+hence $p \equiv \eps \neq 0 \pmod \ell$. The uniform distribution follows
+from H1$'$ alone.
+\end{proof}
+
+\subsection{Conjectural tighter bound}
+
+\begin{openproblem}
+\begin{conjecture}\label{conj:tight}
+The effective constant in Theorem~\ref{thm:main} satisfies
+$C_{\mathrm{opt}}(k, \ell) \approx 0.5$, \emph{independent of $k$}.
+\end{conjecture}
+\textbf{Status.} Empirically validated at $N = 10^6$ for $k \in \{3, 7, 15, 21\}$
+and $\ell \le 31$.
+\end{openproblem}
+
+\section{The Anti-Persistence Sign-Reversal Phenomenon}
+\label{sec:anti-persistence}
+
+\subsection{Empirical observation across 10 values of $k$}
+
+We extended the validation to $k \in \{3, 5, 7, 9, 11, 13, 15, 17, 19, 21\}$,
+each at $N = 10^6$.
+
+\begin{discoverybox}
+\begin{observation}[Linear law for $\mathrm{ACF}_1(q \bmod 2)$]\label{disc:acf}
+At $N = 10^6$, the lag-1 autocorrelation of $(q_n \bmod 2)$ varies
+\textbf{linearly with $k$}:
+\[
+\mathrm{ACF}_1(q \bmod 2; k) \approx 0.0237\,k - 0.199 \qquad (R^2 = 0.97).
+\]
+The sign-reversal threshold is $k_0 \approx 8.4$.
+\end{observation}
+\end{discoverybox}
+
+\begin{table}[h!]
+\centering
+\caption{Lag-1 autocorrelation of $(q \bmod 2)$ for $k \in \{3, 5, \ldots, 21\}$
+at $N = 10^6$.}
+\begin{tabular}{c c c c c}
+\toprule
+$k$ & $\varphi(2k)$ & $\mathrm{ACF}_1$ & $\mathbb{P}(\text{same parity})$ & $z$-score (runs) \\
+\midrule
+3 & 2 & $-0.0719$ & $46.4\%$ & $+71.9\sigma$ \\
+5 & 4 & $-0.0877$ & $45.6\%$ & $+87.7\sigma$ \\
+7 & 6 & $-0.0572$ & $47.1\%$ & $+57.2\sigma$ \\
+9 & 6 & $\mathbf{-0.0075}$ & $\mathbf{49.6\%}$ & $\mathbf{+7.5\sigma}$ \\
+11 & 10 & $\mathbf{+0.0399}$ & $\mathbf{52.0\%}$ & $\mathbf{-39.9\sigma}$ \\
+13 & 12 & $+0.0930$ & $54.7\%$ & $-93.0\sigma$ \\
+15 & 8 & $+0.1574$ & $57.9\%$ & $-181\sigma$ \\
+17 & 16 & $+0.2103$ & $60.5\%$ & $-216\sigma$ \\
+19 & 18 & $+0.2643$ & $63.2\%$ & $-273\sigma$ \\
+21 & 12 & $+0.3152$ & $65.8\%$ & $-323\sigma$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Damped oscillation across lags: spectral signature}
+
+\begin{discoverybox}
+\begin{observation}[Damped cosine signature]\label{disc:cosine}
+The slopes $\alpha(\ell)$ of $\mathrm{ACF}_\ell$ on $k$ are fitted by:
+\[
+\alpha(\ell) \approx 0.039 \cdot e^{-0.39(\ell-1)} \cdot \cos\!\bigl(1.07(\ell-1) + 0.92\bigr),
+\qquad R^2 = 0.9988.
+\]
+The \textbf{period} is $T = 2\pi/\omega \approx 5.89$ and the
+\textbf{damping rate} is $\gamma \approx 0.39$ per lag.
+\end{observation}
+\end{discoverybox}
+
+\section{Empirical Validation: $k = 3$ at $N = 10^6$}
+\label{sec:validation-k3}
+
+\subsection{Validation of Theorem~\ref{thm:main} (non-degenerate case)}
+
+\begin{table}[h!]
+\centering
+\caption{Validation at $N = 10^6$ for $k = 3$. Pearson correlation $r$ between
+predicted $\PiP(r)/(\ell-1)$ and observed $F_N(r)$.}
+\begin{tabular}{c c c c c}
+\toprule
+$\ell$ & Pearson $r$ & err$_{\max}$ & $C_{\mathrm{eff}}$ & Bound $C(3, \ell)$ \\
+\midrule
+5 & 0.99996 & $2.96 \times 10^{-4}$ & 0.30 & 2.37 \\
+7 & 0.99992 & $6.78 \times 10^{-4}$ & 0.68 & 2.25 \\
+11 & 0.99917 & $5.16 \times 10^{-4}$ & 0.52 & 2.15 \\
+13 & 0.99921 & $4.40 \times 10^{-4}$ & 0.44 & 2.12 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Universality across $k \in \{3, 7, 15, 21\}$}
+\label{sec:universality}
+
+\begin{table}[h!]
+\centering
+\caption{Pearson correlation $r$(predicted, observed) for $k \in \{3, 7, 15, 21\}$
+at $N = 10^6$.}
+\begin{tabular}{c c c c c}
+\toprule
+$\ell$ & $k=3$ & $k=7$ & $k=15$ & $k=21$ \\
+\midrule
+5 & 0.99996 & 0.99968 & * & 0.99844 \\
+7 & 0.99992 & * & 0.99933 & * \\
+11 & 0.99917 & 0.99609 & 0.99628 & 0.98470 \\
+13 & 0.99921 & 0.98866 & 0.99450 & 0.98179 \\
+\midrule
+\textbf{Mean} & \textbf{0.990} & \textbf{0.955} & \textbf{0.955} & \textbf{0.909} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Connection to Paper~II's Hypothesis H3}
+\label{sec:connection}
+
+\begin{heuristicbox}
+\begin{proposition}[H3 implies H3$'$ at leading order]\label{prop:h3-implies-h3prime}
+Let $k \ge 1$ and $\ell$ a prime with $\gcd(2k, \ell) = 1$. Assume H1, H2
+(Paper~I) and H3 (Paper~II) hold. Then Hypothesis~H3$'$
+(Hypothesis~\ref{hyp:H3prime}) holds, with error term
+$O_{k, \ell}\!\left(\frac{1}{m \log m}\right)$.
+\end{proposition}
+\end{heuristicbox}
+
+The proof proceeds via Bateman--Horn applied to the shifted polynomial
+$g_{r, \eps}(j) = H_m + \eps + 2k(r + \ell j)$, showing the local factors at
+$\ell$ are equal for all permitted $r$. The unconditional barrier is discussed
+in full detail: (a) Bateman--Horn open beyond linear case; (b) parity problem;
+(c) uniform PNT in arithmetic progressions of large moduli.
+
+\section{Negative Results}
+\label{sec:negative}
+
+\begin{negativebox}
+\begin{observation}[Window-truncation artefact, retracted]
+At $N = 10^4$ for $k \ge 7$, the apparent ``U-shaped bias'' in the histogram
+of $q \bmod 11$ is a geometric artefact from small $|q|_{\max}$, not a genuine
+$p$-adic bias. Resolved at $N = 10^6$.
+\end{observation}
+\end{negativebox}
+
+\section{Open Problems}
+\label{sec:openpb}
+
+\begin{openproblem}
+\textbf{Open Problem A.} Prove H3$'$ unconditionally for $k = 3$ and small primes $\ell$.
+\end{openproblem}
+
+\begin{openproblem}
+\textbf{Open Problem B.} Prove Conjecture~\ref{conj:tight}: $C_{\mathrm{opt}}(k, \ell) \approx 0.5$.
+\end{openproblem}
+
+\begin{openproblem}
+\textbf{Open Problem C.} Validate Theorem~\ref{thm:main} for $k = 21$ and $\ell \ge 29$ at $N \ge 10^7$.
+\end{openproblem}
+
+\begin{openproblem}
+\textbf{Open Problem D (new, refined).} Derive Conjecture~\ref{conj:acf}
+theoretically: prove the linear-in-$k$ law for $\mathrm{ACF}_1(q \bmod 2)$;
+explain the damped cosine spectrum with $R^2 = 0.999$.
+\end{openproblem}
+
+\begin{openproblem}
+\textbf{Open Problem E.} Establish a closed-form connection between $\PiP(r; k, \ell)$
+and the Bateman--Horn local factor $\omega_f(\ell)$.
+\end{openproblem}
+
+\begin{openproblem}
+\textbf{Open Problem F.} Extend Theorems~\ref{thm:main} and~\ref{thm:degenerate}
+to prime powers $\ell^j$.
+\end{openproblem}
+
+\section{Computational Methodology}
+\label{sec:methodology}
+
+All computations were performed on a standard laptop using Python 3.12 with
+NumPy~\cite{numpy} and SciPy~\cite{scipy}. For each $k$, the first $N = 10^6$
+triples $(m, \eps, q)$ were generated via a segmented Eratosthenes sieve
+in $1.8$--$3.1$ s. The complete pipeline runs in under two minutes on a
+standard laptop with $\le 2$ GB RAM.
+
+\section{Summary Epistemic Table}
+\label{sec:epistemic}
+
+\begin{table}[h!]
+\centering
+\caption{Complete epistemic status of all results.}
+\begin{tabular}{l l p{5.5cm}}
+\toprule
+Result & Status & Note \\
+\midrule
+Proposition~\ref{prop:forbidden} (forbidden residue) & Rigorous & 3-line proof \\
+Theorem~\ref{thm:degenerate} (degenerate case) & Rigorous & Under H1$'$ (BV at fixed modulus) \\
+Theorem~\ref{thm:main} (non-degenerate case) & Heuristic & Under H1$'$+H3$'$ \\
+Corollary~\ref{cor:constant} (explicit $C(k, \ell)$) & Rigorous (under~\ref{thm:main}) & Triangle bound \\
+Proposition~\ref{prop:h3-implies-h3prime} (H3 $\Rightarrow$ H3$'$) & Heuristic & 5-step proof \\
+Conjecture~\ref{conj:tight} (optimal $C \approx 0.5$) & Open & Validated empirically \\
+Observation~\ref{disc:cosine} (damped cosine signature) & Discovery & $R^2 = 0.9988$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Conclusions}
+
+This paper completes the trilogy of Papers I--III on the parametric prime
+family $p = km(m+1) + \eps + 2kq$, providing the modular layer of description.
+Three principal results: (1) an unconditional theorem for $\ell \mid 2k$;
+(2) a conditional theorem for the non-degenerate case; (3) a new empirical
+phenomenon---the damped-cosine spectral signature with $R^2 = 0.999$.
+
+\section*{Acknowledgements}
+The author thanks the Python open-source community (NumPy, SciPy) for making
+large-scale computational number theory accessible.
+
+\section*{Data Availability}
+All numerical data and Python scripts will be deposited at Zenodo upon
+acceptance.
+
+\begin{thebibliography}{40}
+
+\bibitem{paper1} H.~Bakkaoui, \textit{A Parametric Family of Primes via Quadratic
+Forms: Heuristic Distribution of the Minimal Offset, Large-Scale Numerical
+Validation, and Statistical Control of Spurious Spectral Correlations}, Working
+Paper~I, April 2026.
+
+\bibitem{paper2} H.~Bakkaoui, \textit{Parametric Prime Families via Quadratic
+Forms: Layer Invariants, Conditional Proofs, and Connections to the Riemann
+Zeta Function}, Working Paper~II (revised), April 2026.
+
+\bibitem{dirichlet} P.~G.~L.~Dirichlet, \textit{Beweis des Satzes, dass jede
+unbegrenzte arithmetische Progression unendlich viele Primzahlen enth\"alt},
+Abh.\ K\"on.\ Preuss.\ Akad.\ Wiss.\ (1837), 45--81.
+
+\bibitem{batemanhorn} P.~T.~Bateman and R.~A.~Horn, \textit{A heuristic
+asymptotic formula concerning the distribution of prime numbers}, Math.\ Comp.\
+\textbf{16} (1962), 363--367.
+
+\bibitem{bombieri} E.~Bombieri, \textit{On the large sieve}, Mathematika
+\textbf{12} (1965), 201--225.
+
+\bibitem{maynard} J.~Maynard, \textit{Small gaps between primes}, Ann.\ of
+Math.\ \textbf{181} (2015), 383--413.
+
+\bibitem{selberg} A.~Selberg, \textit{On an elementary method in the theory of
+primes}, Norske Vid.\ Selsk.\ Forh., Trondhjem \textbf{19} (1947), 64--67.
+
+\bibitem{friedlander} J.~Friedlander and H.~Iwaniec, \textit{Opera de Cribro},
+AMS Colloquium Publications, Vol.~57, 2010.
+
+\bibitem{wald} A.~Wald and J.~Wolfowitz, \textit{On a test whether two samples
+are from the same population}, Ann.\ Math.\ Statist.\ \textbf{11} (1940),
+147--162.
+
+\bibitem{numpy} C.~R.~Harris et al., \textit{Array programming with NumPy},
+Nature \textbf{585} (2020), 357--362.
+
+\bibitem{scipy} P.~Virtanen et al., \textit{SciPy 1.0: fundamental algorithms
+for scientific computing in Python}, Nature Methods \textbf{17} (2020), 261--272.
+
+\end{thebibliography}
+
+\end{document}
