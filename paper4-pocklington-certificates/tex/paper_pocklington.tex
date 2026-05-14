@@ -401,18 +401,13 @@ v2 & Sieve $\to$ $q\equiv 1\pmod{3}$ (Thm~\ref{thm:cubic}) & $25$ & $10^6$ \\
 v3 & Multi-core, checkpoint, centre calibration & $25$ & $10^6$ \\
 v4 & Mod-$7$ filter (Thm~\ref{thm:mod7}) & $25$ & $10^6$ \\
 v5 & $k\colon 25\to 3+20^{*}$; $L\colon 10^6\to 10^7$ & $3+20$ & $10^7$ \\
+v6 & Multi-ratio exploration (round-robin) & $3+20$ & $10^7$ \\
+v7 & Tolerance $\pm 50$, adaptive spread & $3+20$ & $10^7$ \\
 \bottomrule
 \end{tabular}\\[3pt]
 \footnotesize $^{*}$ v5: $3$ initial rounds, then $20$ confirmation rounds
 before Pocklington.
 \end{table}
-
-\begin{remark}[Correctness of MR round reduction]
-Miller--Rabin is \emph{deterministic for primes}: every prime passes every
-round with certainty. Reducing $k$ from $25$ to $3$ carries zero risk of
-missing a true prime; rare composites passing $3$ rounds ($\leq 4^{-3}
-\approx 1.6\%$) are caught by the $20$ confirmation rounds and Pocklington.
-\end{remark}
 
 %==============================================================================
 \section{Computational Results}\label{sec:results}
@@ -460,64 +455,6 @@ The leading and trailing digits of $p$ are:
 \]
 \end{rigorousbox}
 
-\subsection{Filter statistics for the $29\,998$-digit record}
-
-\begin{center}
-\begin{tabular}{@{}lrr@{}}
-\toprule
-Stage & Pairs eliminated & Fraction \\
-\midrule
-Mod-$7$ filter (Thm~\ref{thm:mod7}) & $740$ & $33.3\%$ \\
-Sieve (Cor~\ref{cor:sieve-50}) & $1\,195$ & $53.8\%$ \\
-Miller--Rabin (composites) & $285$ & $12.8\%$ \\
-\midrule
-\textbf{Total eliminated} & $2\,220$ & $\mathbf{87.1\%}$ \\
-Prime found & $1$ & $0.045\%$ \\
-\bottomrule
-\end{tabular}
-\end{center}
-
-%==============================================================================
-\section{Performance and Scaling}\label{sec:scaling}
-%==============================================================================
-
-\subsection{Dominant cost}
-
-The dominant cost is Miller--Rabin: one round on a $D$-digit modulus
-costs $O(D^2\log D\log\log D)$ bit operations (GMP's FFT multiplication
-\cite{GMP}). Sieve and mod-$7$ checks are negligible by comparison.
-
-\subsection{Empirical scaling law}
-
-Wall-clock time per MR event (total time $\div$ MR test count),
-machine: Dell Inspiron 14 Plus (Snapdragon X Plus ARM64, 9 workers):
-
-\begin{center}
-\begin{tabular}{@{}rrrr@{}}
-\toprule
-$D$ & Rounds $k$ & $\tau_{\text{MR}}$ (wall) & Version \\
-\midrule
-$19\,999$ & $25$ & $\approx 9$\,s  & v3 \\
-$29\,998$ & $25$ & $\approx 39$\,s & v4 \\
-$29\,998$ & $3$  & $\approx 5$\,s  & v5 \\
-\bottomrule
-\end{tabular}
-\end{center}
-
-The ratio $39/9 \approx 4.3$ for $D = 30\,000/20\,000 = 1.5\times$
-is consistent with empirical scaling $\tau \propto D^{2.5}$.
-
-\subsection{Projection: $50\,000$-digit record}
-
-With v5 ($k=3$) and scaling $D^{2.5}$:
-\[
-  \tau_{\text{MR}}(50\,000) \approx 5 \times\Bigl(\tfrac{50}{30}\Bigr)^{2.5}
-  \approx 18\text{ s/event}.
-\]
-For $400$--$500$ expected MR events: projected wall time
-$\mathbf{6}$--$\mathbf{10}$ \textbf{hours} (9 workers, same machine).
-A search is currently in progress.
-
 %==============================================================================
 \section{Open Problems}\label{sec:open}
 %==============================================================================
@@ -530,29 +467,13 @@ the forbidden set
   \F_\ell = \bigl\{(a\bmod\mathrm{ord}_\ell(2),\;
                     b\bmod\mathrm{ord}_\ell(3)) : \ell\mid p(a,b)\bigr\}.
 \]
-For $\ell=13$: $\mathrm{ord}_{13}(2)=12$, $\mathrm{ord}_{13}(3)=3$;
-the period is $36$ and the filter eliminates $2/13\approx 15\%$ of
-additional candidates.
-Combining filters for several small $\ell$ could push the pre-MR
-elimination rate above $90\%$.
 \end{problem}
 \end{openprobbox}
 
 \begin{openprobbox}
 \begin{problem}[$50\,000$-digit certificate]\label{op:50k}
 Produce an unconditional Pocklington certificate for a prime of
-$50\,000$ decimal digits in the subfamily. By Proposition~\ref{prop:combined},
-$\approx 87\%$ of candidates are pre-filtered; projected time is
-$6$--$10$ hours (v5, ARM64, 9 workers).
-\end{problem}
-\end{openprobbox}
-
-\begin{openprobbox}
-\begin{problem}[Universality of the witnesses $w_2=5$, $w_3=7$]
-\label{op:witnesses}
-In all four certificates, $w_2=5$ and $w_3=7$ succeeded. Prove (or
-disprove) that $5$ and $7$ are valid Pocklington witnesses for
-\emph{every} prime of the subfamily.
+$50\,000$ decimal digits in the subfamily.
 \end{problem}
 \end{openprobbox}
 
@@ -567,15 +488,12 @@ Three elementary but effective arithmetic theorems — the mod-$6$ identity
 (Theorem~\ref{thm:mod6}), the cubic reciprocity sieve
 (Theorem~\ref{thm:cubic}), and the mod-$7$ forbidden-class filter
 (Theorem~\ref{thm:mod7}) — together eliminate $87\%$ of candidates
-before any large-number computation. Their proofs rest on standard tools:
-the Chinese Remainder Theorem, the non-residuacity of $-3$ modulo primes
-$q\equiv 2\pmod{3}$, and the multiplicative orders $\mathrm{ord}_7(2)=3$,
-$\mathrm{ord}_7(3)=6$.
+before any large-number computation.
 
 Applied via the \textsc{PrimeQuest} multi-core algorithm on a consumer
 laptop, this framework produced four unconditional certificates, culminating
-in a prime of $\mathbf{29\,998}$ decimal digits ($286$ MR events,
-$3$ h $6$ min). A fifth search targeting $50\,000$ digits is in progress.
+in a prime of $\mathbf{29\,998}$ decimal digits. A fifth search targeting
+$50\,000$ digits is in progress.
 
 %==============================================================================
 \section*{Acknowledgements}
@@ -591,15 +509,12 @@ Computations were performed on a Dell Inspiron 14 Plus 7441
 %==============================================================================
 
 \bibitem{PaperI}
-H.~Bakkaoui, \emph{A Parametric Family of Primes via Quadratic Forms:
-Heuristic Distribution of the Minimal Offset, Large-Scale Numerical
-Validation, and Statistical Control of Spurious Spectral Correlations},
+H.~Bakkaoui, \emph{A Parametric Family of Primes via Quadratic Forms},
 Working paper (Paper~I), 2026.
 
 \bibitem{PaperII}
-H.~Bakkaoui, \emph{Parametric Prime Families via Quadratic Forms: Layer
-Invariants, Conditional Proofs, and Connections to the Riemann Zeta
-Function}, Working paper (Paper~II), 2026.
+H.~Bakkaoui, \emph{Parametric Prime Families via Quadratic Forms},
+Working paper (Paper~II), 2026.
 
 \bibitem{AKS2002}
 M.~Agrawal, N.~Kayal, and N.~Saxena, \emph{PRIMES is in P},
@@ -607,8 +522,7 @@ Ann.\ of Math.\ \textbf{160} (2004), 781--793.
 
 \bibitem{GMP}
 T.~Granlund and the GMP development team,
-\emph{GNU Multiple Precision Arithmetic Library}, version~6.3.0,
-\texttt{https://gmplib.org}, 2023.
+\emph{GNU Multiple Precision Arithmetic Library}, version~6.3.0, 2023.
 
 \bibitem{LehmerPSW1975}
 J.~Brillhart, D.~H.~Lehmer, and J.~L.~Selfridge, \emph{New primality

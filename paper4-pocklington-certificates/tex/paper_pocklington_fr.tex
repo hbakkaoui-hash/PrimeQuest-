@@ -1,0 +1,261 @@
+%==============================================================================
+% Certificats de primalité inconditionnels pour p = 3m(m+1)+1
+% H. Bakkaoui — 2026
+%==============================================================================
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[french]{babel}
+\usepackage{amsmath,amssymb,amsthm,mathtools}
+\usepackage{geometry}
+\geometry{margin=2.5cm}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{enumitem}
+\usepackage{caption}
+\usepackage[dvipsnames]{xcolor}
+\usepackage{tcolorbox}
+\tcbuselibrary{skins,breakable}
+\usepackage{hyperref}
+\hypersetup{colorlinks=true,linkcolor=MidnightBlue,
+            citecolor=MidnightBlue,urlcolor=MidnightBlue}
+\usepackage{cleveref}
+
+%--- Environnements théorème --------------------------------------------------
+\newtheorem{theoreme}{Théorème}[section]
+\newtheorem{proposition}[theoreme]{Proposition}
+\newtheorem{lemme}[theoreme]{Lemme}
+\newtheorem{corollaire}[theoreme]{Corollaire}
+\theoremstyle{definition}
+\newtheorem{definition}[theoreme]{Définition}
+\newtheorem{probleme}[theoreme]{Problème ouvert}
+\theoremstyle{remark}
+\newtheorem{remarque}[theoreme]{Remarque}
+
+%--- Boîtes colorées ----------------------------------------------------------
+\newtcolorbox{rigorousbox}[1][]{
+  colback=Green!8, colframe=Green!60!black, arc=1mm,
+  title=\textbf{Résultat rigoureux}, fonttitle=\bfseries, breakable, #1}
+\newtcolorbox{resultbox}[1][]{
+  colback=RoyalBlue!5, colframe=RoyalBlue!70!black, arc=1mm,
+  title=\textbf{Résultat calculatoire}, fonttitle=\bfseries, breakable, #1}
+\newtcolorbox{openprobbox}[1][]{
+  colback=Goldenrod!10, colframe=Goldenrod!70!black, arc=1mm,
+  title=\textbf{Problème ouvert}, fonttitle=\bfseries, breakable, #1}
+
+%--- Raccourcis ---------------------------------------------------------------
+\newcommand{\N}{\mathbb{N}}
+\newcommand{\Z}{\mathbb{Z}}
+\newcommand{\F}{\mathcal{F}}
+\newcommand{\Leg}[2]{\left(\dfrac{#1}{#2}\right)}
+
+%==============================================================================
+\title{Certificats de primalité inconditionnels\\
+pour les entiers de la forme $p = 3m(m+1)+1$ :\\[4pt]
+{\large Filtres arithmétiques, recherche multi-c\oe{}urs\\
+et records jusqu'à $29\,998$ chiffres décimaux}}
+
+\author{Hassane \textsc{Bakkaoui}\\
+\small Chercheur indépendant\\
+\small \texttt{bakkahassa@hotmail.com}}
+
+\date{2026}
+%==============================================================================
+
+\begin{document}
+\maketitle
+
+%------------------------------------------------------------------------------
+\begin{abstract}
+Nous étudions la sous-famille paramétrique $p = 3m(m+1)+1$,
+$m = 2^a\cdot 3^b - 1$, $a,b \in \N^*$, du point de vue de la
+certification \emph{inconditionnelle} de primalité via le critère de
+Pocklington--Lehmer \cite{Pocklington1914,LehmerPSW1975}.
+
+La structure $3$-lisse de $m+1 = 2^a\cdot 3^b$ fournit, pour tout $(a,b)$,
+un diviseur complètement factorisé $F = 2^a\cdot 3^{b+1}$ de $p-1$
+satisfaisant $F>\sqrt{p}$ inconditionnellement
+(Lemme~\ref{lem:factorisation}), réduisant le certificat à la recherche
+de témoins pour $q\in\{2,3\}$ seulement.
+
+Nous établissons trois théorèmes de structure arithmétique :
+\begin{itemize}
+\item \textbf{Théorème~\ref{thm:mod6} :}
+  $p\equiv 1\pmod{6}$ pour tout $(a,b)$.
+\item \textbf{Théorème~\ref{thm:cubique} :}
+  tout premier $q\equiv 2\pmod{3}$ vérifie $q\nmid p$,
+  réduisant le crible de $50\%$.
+\item \textbf{Théorème~\ref{thm:mod7} :}
+  $7\mid p$ si et seulement si $(a\bmod 3,\,b\bmod 6)\in\F$,
+  éliminant $33\%$ des candidats à coût arithmétique nul.
+\end{itemize}
+
+Combines, ces trois résultats éliminent $\approx 87\%$ de tous les
+candidats avant tout calcul en grande précision. L'algorithme
+multi-c\oe{}urs \textsc{PrimeQuest} (versions v1--v7) exploite ce pipeline
+pour produire quatre certificats de Pocklington--Lehmer inconditionnels,
+le plus grand étant
+\[
+  p = 3m(m+1)+1,\quad m = 2^{19435}\cdot 3^{19173}-1,
+\]
+un nombre premier de $\mathbf{29\,998}$ \textbf{chiffres décimaux} trouvé
+en $3$ h $06$ min sur un ordinateur portable grand public
+(ARM64, 9 c\oe{}urs).
+
+\smallskip
+\noindent\textbf{MSC 2020 :} 11A41, 11Y11, 11N13.\\
+\textbf{Mots-clés :} certificat de primalité, Pocklington--Lehmer,
+filtres arithmétiques, résidus quadratiques, records de grands premiers.
+\end{abstract}
+
+\tableofcontents
+
+%==============================================================================
+\section{Introduction}\label{sec:intro}
+%==============================================================================
+
+Prouver inconditionnellement qu'un entier donné est premier est une tâche
+centrale de la théorie algorithmique des nombres. Pour les grands premiers
+génériques, la voie la plus pratique est le critère de
+Pocklington--Lehmer~\cite{Pocklington1914,LehmerPSW1975} : exhiber un
+diviseur complètement factorisé $F>\sqrt{p}$ de $p-1$ et vérifier des
+témoins.
+
+La sous-famille
+\[
+  p = 3m(m+1)+1,\qquad m = 2^a\cdot 3^b-1,\qquad a,b\in\N^*,
+\]
+est construite de sorte que $m+1=2^a\cdot 3^b$ soit $3$-lisse par
+construction, rendant $F=2^a\cdot 3^{b+1}$ complètement factorisé et
+vérifiant $F>\sqrt{p}$ pour tout $(a,b)$, sans aucune condition sur $p$.
+
+Au-delà de la structure du certificat, la famille satisfait trois
+contraintes arithmétiques indépendantes
+(Théorèmes~\ref{thm:mod6}--\ref{thm:mod7}) qui éliminent collectivement
+$87\%$ des candidats avant tout calcul en grande précision.
+
+%==============================================================================
+\section{La sous-famille de Pocklington}\label{sec:famille}
+%==============================================================================
+
+\begin{definition}[Sous-famille de Pocklington]\label{def:pocklington}
+Pour des entiers $a,b\geq 1$, on définit
+\[
+  m(a,b) = 2^a\cdot 3^b - 1, \qquad
+  p(a,b) = 3m(m+1)+1 = 3m^2+3m+1.
+\]
+\end{definition}
+
+\begin{rigorousbox}
+\begin{lemme}[Factorisation explicite]\label{lem:factorisation}
+$p - 1 = 2^a\cdot 3^{b+1}\cdot m$, $F := 2^a\cdot 3^{b+1} > \sqrt{p}$.
+\end{lemme}
+\end{rigorousbox}
+
+\begin{rigorousbox}
+\begin{theoreme}[Certificat de Pocklington--Lehmer
+\cite{Pocklington1914,LehmerPSW1975}]\label{thm:Pocklington}
+$p$ est premier ssi $\exists\,w_2,w_3$ tels que, pour $q\in\{2,3\}$,
+$w_q^{p-1}\equiv 1\pmod{p}$ et $\gcd(w_q^{(p-1)/q}-1,p)=1$.
+\end{theoreme}
+\end{rigorousbox}
+
+%==============================================================================
+\section{Théorèmes de structure arithmétique}\label{sec:filtres}
+%==============================================================================
+
+\begin{rigorousbox}
+\begin{theoreme}[Modulo $6$]\label{thm:mod6}
+Pour tout $a,b\geq 1$, $p(a,b)\equiv 1\pmod{6}$.
+\end{theoreme}
+\end{rigorousbox}
+
+\begin{rigorousbox}
+\begin{theoreme}[Crible par réciprocité cubique]\label{thm:cubique}
+Soit $q\geq 5$ premier avec $q\equiv 2\pmod{3}$. Alors $q\nmid p$.
+\end{theoreme}
+\end{rigorousbox}
+
+\begin{corollaire}[Réduction du crible de $50\%$]\label{cor:crible-50}
+Seuls les premiers $q\equiv 1\pmod{3}$ doivent être testés.
+\end{corollaire}
+
+\begin{rigorousbox}
+\begin{theoreme}[Classes interdites modulo $7$]\label{thm:mod7}
+Soit $\F_7 = \{(0,2),(0,3),(1,0),(1,1),(2,4),(2,5)\}$.
+Alors $7\mid p(a,b) \Leftrightarrow (a\bmod 3,\,b\bmod 6)\in\F_7$.
+\end{theoreme}
+\end{rigorousbox}
+
+%==============================================================================
+\section{L'algorithme \textsc{PrimeQuest}}\label{sec:algo}
+%==============================================================================
+
+\begin{table}[ht]\centering
+\caption{Versions successives de \textsc{PrimeQuest}.}
+\label{tab:versions}
+\begin{tabular}{@{}clcc@{}}
+\toprule
+Version & Optimisation ajoutée & Tours MR $k$ & Limite crible $L$ \\
+\midrule
+v1 & Recherche séquentielle de base & $25$ & $10^6$ \\
+v2 & Crible $q\equiv 1\pmod{3}$ & $25$ & $10^6$ \\
+v3 & Multi-c\oe{}urs, point de reprise & $25$ & $10^6$ \\
+v4 & Filtre mod-$7$ & $25$ & $10^6$ \\
+v5 & $k\colon 25\to 3+20$ ; $L\colon 10^6\to 10^7$ & $3+20$ & $10^7$ \\
+v6 & Exploration multi-ratio (round-robin) & $3+20$ & $10^7$ \\
+v7 & Tolérance $\pm 50$, spread adaptatif & $3+20$ & $10^7$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+%==============================================================================
+\section{Résultats calculatoires}\label{sec:resultats}
+%==============================================================================
+
+\begin{table}[ht]\centering
+\caption{Certificats Pocklington de la campagne \textsc{PrimeQuest}.}
+\label{tab:resultats}
+\begin{tabular}{@{}rrrrrrrr@{}}
+\toprule
+Chiffres de $p$ & $a$ & $b$ & $b/a$ & Tests MR & Élim. & Temps & Workers \\
+\midrule
+$9\,998$  & $6\,212$  & $6\,738$  & $1{,}085$ & ---      & ---      & ---             & $1$ \\
+$10\,000$ & $6\,213$  & $6\,740$  & $1{,}085$ & ---      & ---      & ---             & $1$ \\
+$19\,999$ & $12\,228$ & $13\,242$ & $1{,}083$ & $1\,050$ & $87{,}9\%$ & $2$\,h\,$40$\,min & $9$ \\
+$29\,998$ & $19\,435$ & $19\,173$ & $0{,}987$ & $286$    & $87{,}1\%$ & $3$\,h\,$06$\,min & $9$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+%==============================================================================
+\section{Conclusion}\label{sec:conclusion}
+%==============================================================================
+
+Trois théorèmes arithmétiques élémentaires éliminent $87\%$ des candidats
+avant tout calcul en grande précision. Appliqué via l'algorithme
+multi-c\oe{}urs \textsc{PrimeQuest}, ce cadre a produit quatre certificats
+inconditionnels, culminant en un premier de $\mathbf{29\,998}$ chiffres
+décimaux. Une cinquième recherche ciblant $50\,000$ chiffres est en cours.
+
+%==============================================================================
+\begin{thebibliography}{99}
+%==============================================================================
+
+\bibitem{LehmerPSW1975}
+J.~Brillhart, D.~H.~Lehmer et J.~L.~Selfridge,
+Math.\ Comp.\ \textbf{29} (1975), 620--647.
+
+\bibitem{Pocklington1914}
+H.~C.~Pocklington,
+Proc.\ Cambridge Philos.\ Soc.\ \textbf{18} (1914--1916), 29--30.
+
+\bibitem{IrelandRosen}
+K.~Ireland et M.~Rosen, \emph{A Classical Introduction to Modern
+Number Theory}, Springer, 1990.
+
+\end{thebibliography}
+
+\end{document}

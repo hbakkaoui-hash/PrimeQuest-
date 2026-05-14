@@ -25,7 +25,6 @@ LOG10_3 = math.log10(3)
 FILE_V6 = f"checkpoint_{DIGITS_CIBLE}_v6.json"
 FILE_V7 = f"checkpoint_{DIGITS_CIBLE}_v7.json"
 
-# ── Recalcul de TOUS_RATIOS (même logique que _generer_tous_ratios() dans v7) ─
 def tous_ratios_v7():
     step  = (2 * SPREAD_MAX / (N_RATIOS_MAX - 1))
     bruts = [round(RATIO_CENTRE - SPREAD_MAX + i * step, 4) for i in range(N_RATIOS_MAX)]
@@ -43,7 +42,6 @@ def tous_ratios_v7():
 
 TOUS_RATIOS = tous_ratios_v7()
 
-# ── Chargement checkpoint v6 ────────────────────────────────────────────
 if not os.path.exists(FILE_V6):
     print(f"❌  Fichier {FILE_V6} introuvable.")
     sys.exit(1)
@@ -65,7 +63,6 @@ print(f"  Deltas : {v6_deltas}")
 print(f"  MR cumulés : {v6.get('n_mr', 0)}")
 print(f"  Temps cumulé : {v6.get('t_cumul', 0)/3600:.2f}h")
 
-# ── Mapping v6 → v7 ──────────────────────────────────────────────────────
 v7_deltas = [0] * len(TOUS_RATIOS)
 v7_sides  = [0] * len(TOUS_RATIOS)
 
@@ -88,12 +85,10 @@ for r, i, d in transferes:
 
 if non_trouves:
     print(f"\n⚠  Ratios v6 absents de TOUS_RATIOS v7 (perdus) : {non_trouves}")
-    print(f"   Vérifier que RATIO_CENTRE, SPREAD_MAX et N_RATIOS_MAX sont identiques.")
 
 nouveaux = [r for r in TOUS_RATIOS if r not in v6_ratios]
 print(f"\nNouveaux ratios v7 (delta=0) : {nouveaux}")
 
-# ── Écriture checkpoint v7 ────────────────────────────────────────────
 v7 = {
     "digits":      DIGITS_CIBLE,
     "version":     7,

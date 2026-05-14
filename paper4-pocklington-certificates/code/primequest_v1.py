@@ -8,7 +8,7 @@ Trois méthodes complémentaires, toutes fondées sur Pocklington N-1 :
   3. Pocklington récursif (Maurer) : universel, garantit toute taille
 
 Usage : python3 primequest.py [DIGITS]
-        Ou modifier DIGITS_CIBLE ci-dessous.
+        Ou modifier DIGITS ci-dessous.
 """
 
 import gmpy2
@@ -88,8 +88,6 @@ def pocklington_test(p: gmpy2.mpz, facteurs_F: list) -> tuple:
 
 def _enumerer_paires(digits: int, tol: int) -> list:
     d_min, d_max = digits - tol, digits + tol
-    # Borne supérieure sur a : p ≈ 3·(2^a·3^b)^2, donc log10(p) ≈ 2a·log10(2)
-    # Pour nb ≤ d_max : a ≤ d_max / (2·log10(2)) ≈ d_max * 1.66
     a_max = int(d_max * 1.67) + 5
     paires = []
     for a in range(1, a_max):
@@ -136,7 +134,6 @@ def methode1_famille(digits: int, tol: int) -> Optional[dict]:
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # MÉTHODE 2 : Proth  p = k·2^n+1,  k impair < 2^n
-# Théorème de Proth : ∃a : a^((p-1)/2) ≡ −1 (mod p)  ⟹  p premier
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def _proth_test(p: gmpy2.mpz) -> tuple:
@@ -150,7 +147,6 @@ def _proth_test(p: gmpy2.mpz) -> tuple:
 def methode2_proth(digits: int, tol: int) -> Optional[dict]:
     print("\n  ── Méthode 2 : Proth  p = k·2^n+1 ──")
     d_min, d_max = digits - tol, digits + tol
-    # n ≈ (digits/2)·log2(10)  →  2^n a ≈ digits/2 chiffres
     n_cible   = int(digits / 2 * math.log2(10))
     MAX_ESSAIS = 200_000
     essais    = 0
@@ -196,17 +192,9 @@ def methode2_proth(digits: int, tol: int) -> Optional[dict]:
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # MÉTHODE 3 : Pocklington récursif (algorithme de Maurer)
-# Garantit la certification pour n'importe quelle taille
-#
-# Principe : pour certifier p à bits_cible bits,
-#   1. Certifier récursivement q à ≈ bits_cible/2 bits
-#   2. Chercher p = 2·k·q + 1 (donc p−1 = 2·k·q, F = 2·q > √p)
-#   3. Appliquer Pocklington avec facteurs {2, q}
-# Profondeur ≈ log2(bits_cible / 64) niveaux
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def _certifier_petit(bits: int) -> gmpy2.mpz:
-    """Premier certifié de ~bits bits (cas de base, bits ≤ 64)."""
     if bits <= 2:
         return gmpy2.mpz(3)
     lo = gmpy2.mpz(1) << (bits - 1)
@@ -219,11 +207,6 @@ def _certifier_petit(bits: int) -> gmpy2.mpz:
     return gmpy2.mpz(hi | 1)
 
 def pocklington_recursif(bits_cible: int, profondeur: int = 0) -> tuple:
-    """
-    Retourne (p, chaine) :
-      p     : premier certifié de exactement bits_cible bits
-      chaine: liste de dicts décrivant chaque niveau de preuve
-    """
     ind = "    " + "  " * profondeur
 
     if bits_cible <= 64:
@@ -231,7 +214,6 @@ def pocklington_recursif(bits_cible: int, profondeur: int = 0) -> tuple:
         print(f"{ind}Base [{profondeur}] : {bits_cible} bits → {p}")
         return p, [{"type": "base", "p": p}]
 
-    # bits du sous-premier q : bits_cible//2 + 3 garantit F = 2q > √p
     bits_q = bits_cible // 2 + 3
 
     print(f"{ind}Niveau [{profondeur}] : {bits_cible} bits  "
@@ -330,12 +312,10 @@ def afficher_resultat(res: dict, t_total: float):
         print(f"  n = {res['n']}")
         print(f"  p = k·2^{res['n']}+1  ({nb} chiffres)")
         print(f"  Théorème de Proth : a={res['a_temoin']}  ✅")
-        print(f"    a^((p-1)/2) ≡ -1 (mod p)  ✅")
 
     elif "récursif" in m:
         chaine = res["chaine"]
         print(f"  Longueur de la chaîne de certification : {len(chaine)} niveaux")
-        print(f"  Résumé (du plus petit au plus grand) :")
         for i, c in enumerate(chaine):
             if c["type"] == "base":
                 print(f"    [{i}] Base      : p = {c['p']}")
@@ -399,14 +379,11 @@ if __name__ == "__main__":
     t_debut = time.perf_counter()
     res     = None
 
-    # Méthode 1 : famille rapide avec structure connue
     res = methode1_famille(DIGITS_CIBLE, TOLERANCE)
 
-    # Méthode 2 : Proth si la famille ne donne rien
     if res is None:
         res = methode2_proth(DIGITS_CIBLE, TOLERANCE)
 
-    # Méthode 3 : Pocklington récursif — garantie universelle
     if res is None:
         res = methode3_recursive(DIGITS_CIBLE)
 
