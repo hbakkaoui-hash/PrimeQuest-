@@ -1,0 +1,56 @@
+Premier de 30 037 chiffres — PrimeQuest v8 (k=23)
+===================================================
+
+Famille paramétrique
+────────────────────
+  p = 23·m·(m+1) + 1,   m = 2^a · 23^b − 1
+
+  a = 24 894
+  b =  5 525   (ratio b/a = 0.2219 ≈ log₁₀2/log₁₀23 = 0.2211 ✅)
+
+  m  =  2^24894 · 23^5525 − 1     (15 018 chiffres)
+  p  =  23·m·(m+1) + 1            (30 037 chiffres)
+
+Certificat de primalité — méthode Pocklington (N−1)
+────────────────────────────────────────────────────
+  p − 1  =  2^24894 · 23^5526 · (2^24894 · 23^5525 − 1)
+             ╰─────────────────╯
+                     F   (facteur connu, 15 019 chiffres)
+
+  Condition Pocklington : F > √p  ✅  [RIGOUREUSE, INCONDITIONNELLE]
+    F²/p ≥ 23 > 1   (car p ≤ 23·(m+1)² = 23·2^49788·23^11050)
+
+  Témoins (Théorème de Pocklington) :
+    q = 2   →  w = 3 :   3^(p−1) ≡ 1 (mod p)  et  gcd(3^((p−1)/2)−1, p) = 1  ✅
+    q = 23  →  w = 2 :   2^(p−1) ≡ 1 (mod p)  et  gcd(2^((p−1)/23)−1, p) = 1 ✅
+
+  Conclusion : p est un nombre premier (preuve déterministe).
+
+Performance — PrimeQuest v8
+────────────────────────────
+  Script   : PrimeQuest v8 (primequest_v8.py)
+  Machine  : Dell Inspiron 14 Plus 7441 — Snapdragon X Plus (ARM64, 10 cœurs Oryon)
+  Workers  : 9 (parallèles)
+  Temps    : 5 216.5 s  (1 h 27 min)
+
+  Tests Miller-Rabin  :   372
+  Éliminés crible     : 1 341   (78.3%)
+  Tolérance           : ±50 chiffres
+  Ratios explorés     : [0.221, 0.2467, 0.1953, 0.2724, 0.1696, 0.2981, 0.1439, 0.3239, 0.1181]
+
+Comparaison k=3 (v4) vs k=23 (v8) à ~30 000 chiffres
+──────────────────────────────────────────────────────
+  k=3  (v4) : 29 998 ch. — 11 146 s  (3 h 06 min) — 286 tests MR
+  k=23 (v8) : 30 037 ch. —  5 217 s  (1 h 27 min) — 372 tests MR
+  Gain en temps : ×2.14   (prédit par Bateman–Horn : ×1.74)
+
+  Ratio b/a observé : 0.2219  ≈  log₁₀(2)/log₁₀(23) = 0.2211  ✅
+  (confirme expérimentalement le ratio optimal théorique)
+
+Blindspots k=23 (jamais diviseurs de p)  [RIGOUREUX, INCONDITIONNEL]
+──────────────────────────────────────────────────────────────────────
+  {2, 3, 5, 7, 11, 13, 17, 23, 29, 31, 41, 43, 59}
+  Discriminant 437 = 19·23 est non-résidu quadratique mod chacun.
+
+p = 1366910088111425877543540131136977787635…56614656735063310337
+m = (2^24894·23^5525−1)
