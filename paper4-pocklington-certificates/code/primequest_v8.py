@@ -47,7 +47,7 @@ import multiprocessing as mp
 # PARAMÈTRES — modifier ici
 # ═══════════════════════════════════════════════════════════════
 K                = 23          # constante de la famille p = K·m·(m+1)+1
-DIGITS_CIBLE     = 50_000      # nombre de chiffres souhaité
+DIGITS_CIBLE     = 30_000      # nombre de chiffres souhaité
 TIMEOUT_S        = 14_400      # durée max par session (4h)
 TOLERANCE        = 50          # tolérance ±chiffres
 MR_TOURS         = 3           # tours Miller-Rabin rapide
