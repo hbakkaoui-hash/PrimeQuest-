@@ -1,0 +1,198 @@
+% ═══════════════════════════════════════════════════════════════════════════
+%  Section : Résultats expérimentaux — PrimeQuest v8 et améliorations v9
+%  À insérer dans Paper IV (Pocklington certificates)
+% ═══════════════════════════════════════════════════════════════════════════
+
+\section{Résultats expérimentaux et optimisations algorithmiques}
+\label{sec:resultats_v8_v9}
+
+%─────────────────────────────────────────────────────────────────────────────
+\subsection{Premier de 30\,037 chiffres — PrimeQuest v8}
+\label{subsec:v8_30037}
+
+\subsubsection{Structure du premier trouvé}
+
+Nous avons appliqué l'algorithme PrimeQuest v8 à la famille paramétrique $k=23$ :
+\[
+  p \;=\; 23\,m(m+1)+1, \qquad m \;=\; 2^{a}\cdot 23^{b}-1,
+\]
+avec les paramètres optimaux
+\[
+  a = 24\,894, \quad b = 5\,525, \quad
+  \frac{b}{a} = 0{,}2219 \;\approx\; \frac{\log_{10}2}{\log_{10}23} = 0{,}2211.
+\]
+Le nombre $p$ obtenu possède $\mathbf{30\,037}$ chiffres décimaux.
+
+\subsubsection{Certificat de primalité (Pocklington--Lehmer)}
+
+La factorisation partielle de $p-1$ est
+\[
+  p - 1 \;=\; \underbrace{2^{24894}\cdot 23^{5526}}_{F,\;\;15\,019\text{ chiffres}}
+            \;\cdot\; \underbrace{\bigl(2^{24894}\cdot 23^{5525}-1\bigr)}_{m,\;\;15\,018\text{ chiffres}}.
+\]
+La condition de Pocklington $F > \sqrt{p}$ est satisfaite de façon \emph{rigoureuse et inconditionnelle} :
+\[
+  \frac{F^2}{p} \;\geq\; 23 \;>\; 1
+  \qquad \bigl(\text{car } p \leq 23(m+1)^2 = 23\cdot 2^{49788}\cdot 23^{11050}\bigr).
+\]
+Les témoins du théorème de Pocklington sont :
+\begin{center}
+\begin{tabular}{cccl}
+\hline
+$q$ & $w$ & $w^{p-1} \bmod p$ & $\gcd\bigl(w^{(p-1)/q}-1,\,p\bigr)$ \\
+\hline
+$2$  & $3$ & $1$ & $1$ \quad \checkmark \\
+$23$ & $2$ & $1$ & $1$ \quad \checkmark \\
+\hline
+\end{tabular}
+\end{center}
+\noindent La vérification indépendante (script \texttt{verifier\_certificat\_v8.py}) confirme la primalité de façon \emph{déterministe}.
+
+%─────────────────────────────────────────────────────────────────────────────
+\subsection{Performance et comparaison $k=3$ vs $k=23$}
+\label{subsec:comparaison_k3_k23}
+
+\begin{table}[h]
+\centering
+\caption{Comparaison des performances à $\approx 30\,000$ chiffres}
+\label{tab:comparaison_k3_k23}
+\begin{tabular}{lcccccc}
+\hline
+Version & $k$ & Chiffres & Temps & Tests MR & Éliminés crible & Gain \\
+\hline
+PrimeQuest v4 & $3$  & $29\,998$ & $11\,146$\,s $(3$\,h\,$06$\,min$)$ & $286$ & — & $1\times$ \\
+PrimeQuest v8 & $23$ & $30\,037$ & $\phantom{1}5\,217$\,s $(1$\,h\,$27$\,min$)$ & $372$ & $78{,}3\,\%$ & $\mathbf{\times 2{,}14}$ \\
+\hline
+\end{tabular}
+\end{table}
+
+\paragraph{Interprétation.}
+Le gain observé $\times 2{,}14$ dépasse la prédiction heuristique de Bateman--Horn
+($\times 1{,}74$, rapport des constantes $C(f_{23})/C(f_3) = 5{,}839/3{,}361$).
+L'écart s'explique par deux effets cumulatifs :
+
+\begin{enumerate}
+  \item \textbf{Densité accrue de premiers.}
+  La constante de Bateman--Horn $C(f_{23,+1}) \approx 5{,}839$ est $1{,}74$ fois supérieure
+  à $C(f_{3,+1}) \approx 3{,}361$, traduisant une densité intrinsèquement plus élevée
+  de premiers dans la famille $k=23$ (prédit : $\times 1{,}74$).
+
+  \item \textbf{Efficacité renforcée du crible.}
+  Les 13 \emph{points aveugles} (primes $q$ qui ne divisent jamais $p$)
+  — $\{2,3,5,7,11,13,17,23,29,31,41,43,59\}$ —
+  sont établis de façon rigoureuse : le discriminant $\Delta = 437 = 19\times23$
+  est non-résidu quadratique modulo chacun d'eux (critère d'Euler).
+  Le crible élimine $78{,}3\,\%$ des candidats avant tout test probabiliste,
+  contribuant au gain supplémentaire observé ($\times 2{,}14$ vs $\times 1{,}74$ prédit).
+\end{enumerate}
+
+\paragraph{Ratio $b/a$ optimal.}
+Le ratio observé $b/a = 0{,}2219$ vérifie expérimentalement la prédiction théorique
+\[
+  \left(\frac{b}{a}\right)_{\!\text{opt}}
+  = \frac{\log_{10} 2}{\log_{10} 23} = 0{,}2211,
+\]
+qui égalise les contributions en chiffres de $2^a$ et $23^b$, maximisant la densité
+locale de candidats à taille de $p$ fixée.
+
+\paragraph{Configuration matérielle.}
+Les mesures ont été effectuées sur un Dell Inspiron 14 Plus 7441 équipé d'un
+processeur Snapdragon X Plus (ARM64, 10 cœurs Oryon), avec 9 workers parallèles.
+
+%─────────────────────────────────────────────────────────────────────────────
+\subsection{Optimisations algorithmiques — PrimeQuest v9}
+\label{subsec:v9_optimisations}
+
+PrimeQuest v9 introduit quatre optimisations sur la version v8,
+\emph{mathématiquement équivalentes} (aucune modification de la famille ni du certificat).
+
+\subsubsection{[v9-1] Appel Miller--Rabin unique}
+
+Dans v8, deux appels successifs \texttt{is\_prime(p,\,3)} puis \texttt{is\_prime(p,\,20)}
+étaient effectués. Or, pour les composites ($> 99\,\%$ des cas après crible), les deux
+appels exécutaient chacun le test BPSW complet — doublon inutile. Pour les pseudo-premiers
+(cas rarissime), le second appel était redondant.
+
+\textbf{Correction v9 :} un seul appel \texttt{is\_prime(p,\,15)} (gmpy2, test BPSW
+suivi de 15 tours de Miller--Rabin). Cette simplification réduit le surcoût sur les
+composites et améliore la lisibilité du code sans perte de rigueur probabiliste.
+
+\subsubsection{[v9-2] Crible par grille (\emph{grid sieve})}
+
+\paragraph{Observation clé.}
+Pour tout premier $q$, la valeur $2^a \bmod q$ est périodique en $a$ avec période
+$r_2 = \mathrm{ord}_q(2)$ (ordre multiplicatif de 2 modulo $q$). De même,
+$23^b \bmod q$ est périodique en $b$ avec période $r_{23} = \mathrm{ord}_q(23)$.
+
+\paragraph{Construction de la grille.}
+On pré-calcule, pour chaque $q \leq \texttt{GRID\_LIMIT} = 1\,000$, l'ensemble des
+paires interdites :
+\[
+  \mathcal{F}_q \;=\; \bigl\{(i,j)\in \mathbb{Z}/r_2\mathbb{Z}\times\mathbb{Z}/r_{23}\mathbb{Z}
+  \;:\; p \equiv 0 \pmod{q}\bigr\}.
+\]
+Le test de divisibilité par $q$ se réduit alors à un lookup $O(1)$ :
+\[
+  q \mid p \;\iff\; (a \bmod r_2,\; b \bmod r_{23}) \in \mathcal{F}_q.
+\]
+
+\paragraph{Équivalence rigoureuse.}
+L'égalité $2^a \equiv 2^{a \bmod r_2} \pmod{q}$ suit directement de la définition
+de l'ordre multiplicatif ($r_2 \mid q-1$ par le petit théorème de Fermat).
+
+\paragraph{Gain.}
+Le crible par grille est $\times 5$--$10$ plus rapide sur les $q \leq 1\,000$ que
+le calcul direct par \texttt{pow()}. Son impact sur le temps total reste modeste
+(le test MR/BPSW domine à grande taille), mais il prépare l'ajustement dynamique
+de \texttt{SIEVE\_LIMIT} décrit en §\,\ref{subsubsec:instrumentation}.
+
+\subsubsection{[v9-3] Mémoïsation de $2^a$ par worker}
+
+La fonction \texttt{b\_valides()} retourne plusieurs valeurs de $b$ pour chaque $a$.
+Dans v8, chaque worker recalculait $2^a$ (entier de $\approx 7\,500$ chiffres) pour
+chaque paire $(a,b)$. Dans v9, le résultat est mis en cache dans un dictionnaire
+local au processus (taille maximale $\texttt{CACHE\_POW2A\_SIZE} = 8$ entrées, politique FIFO).
+
+Le gain est négligeable pour les grandes valeurs de $a$ (gmpy2 est optimisé),
+mais mesurable lorsque la tolérance est élevée ($\geq 5$ valeurs de $b$ par $a$).
+
+\subsubsection{[v9-4] Instrumentation du ratio $t_{\text{crible}}/t_{\text{MR}}$}
+\label{subsubsec:instrumentation}
+
+Chaque worker retourne maintenant ses temps de crible ($t_{\text{crible}}$) et de
+test probabiliste ($t_{\text{MR}}$). Le rapport affiche le ratio agrégé :
+
+\begin{itemize}
+  \item Si $t_{\text{crible}}/t_{\text{MR}} \gg 1$ : le crible est le goulot d'étranglement
+  $\Rightarrow$ réduire \texttt{SIEVE\_LIMIT}.
+  \item Si $t_{\text{crible}}/t_{\text{MR}} \ll 1$ : le crible est sous-utilisé
+  $\Rightarrow$ augmenter \texttt{SIEVE\_LIMIT} pour éliminer davantage de composites.
+\end{itemize}
+
+Cette instrumentation permet un calibrage empirique de \texttt{SIEVE\_LIMIT}
+optimal pour la cible de 50\,000 chiffres, sans hypothèse a priori sur la machine.
+
+%─────────────────────────────────────────────────────────────────────────────
+\subsection{Synthèse et perspectives}
+\label{subsec:synthese}
+
+\begin{table}[h]
+\centering
+\caption{Récapitulatif des optimisations v8 $\to$ v9}
+\label{tab:recap_v8_v9}
+\begin{tabular}{clll}
+\hline
+Tag & Description & Équivalence & Gain attendu \\
+\hline
+{[v9-1]} & Appel MR unique & Oui & Faible \\
+{[v9-2]} & Crible par grille & Oui (ordre multiplicatif) & $\times 5$--$10$ sur crible \\
+{[v9-3]} & Cache $2^a$ & Triviale & Faible--modéré \\
+{[v9-4]} & Instrumentation & N/A & Calibrage adaptatif \\
+\hline
+\end{tabular}
+\end{table}
+
+Les propriétés mathématiques de la famille $k=23$ sont \emph{inchangées} :
+les 13 points aveugles, la condition $F > \sqrt{p}$, et le certificat de Pocklington
+$(q \in \{2, 23\})$ demeurent identiques à v8. La cible immédiate est la recherche
+d'un premier de $\mathbf{50\,000}$ chiffres avec PrimeQuest v9.
