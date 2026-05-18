@@ -1,5 +1,108 @@
 # Base de données unifiée — Famille paramétrique de premiers
 
+**Auteur :** Hassane BAKKAOUI — Chercheur indépendant  
+**Contact :** bakkahassa@hotmail.com  
+**Dépôt :** https://github.com/hbakkaoui-hash/PrimeQuest-  
+**Licence :** MIT License  
+**Date :** Mai 2026 — Version 1.0.0  
+**arXiv :** math.NT *(à compléter après soumission)*
+
+---
+
+## Références — Papers I–IV
+
+| Réf.      | Titre abrégé |
+|-----------|-------------|
+| Paper I   | Distribution heuristique du décalage minimal q_min et validation numérique |
+| Paper II  | Familles paramétriques et densités de Bateman-Horn pour k ∈ {3,15,21,23} |
+| Paper III | Connexion GUE / zéros de Riemann via la décomposition Q ≈ α√p + β·D_N |
+| Paper IV  | Certificats de Pocklington pour la famille p = k·m(m+1)+ε+2k·q (50 000 chiffres) |
+
+---
+
+## Préambule mathématique
+
+### Formule centrale
+
+```
+p = k · m·(m+1) + ε + 2k · q
+```
+
+| Symbole | Domaine | Définition |
+|---------|---------|-----------|
+| `p` | premier | le nombre premier étudié |
+| `k` | {3, 15, 21, 23} | paramètre de famille (voir ci-dessous) |
+| `ε` | {+1, −1} | signe, déterminé par `p mod 2k` |
+| `m` | ℤ≥0 | indice de couche (choix canonique minimisant \|q\|) |
+| `q` | ℤ | décalage signé = q_min par construction |
+
+### Signification des quatre valeurs de k
+
+| k  | 2k | φ(2k) | Premiers couverts | Densité relative |
+|----|-----|-------|-------------------|-----------------|
+| 3  | 6   | 2     | **Tous** p > 3 (p ≡ ±1 mod 6) | 1 |
+| 15 | 30  | 8     | p ≡ ±1 (mod 30) | 2/8 = 1/4 |
+| 21 | 42  | 12    | p ≡ ±1 (mod 42) | 2/12 = 1/6 |
+| 23 | 46  | 22    | p ≡ ±1 (mod 46) | 2/22 = 1/11 |
+
+Les valeurs k=15, 21, 23 définissent des sous-familles arithmétiquement
+structurées permettant d'étudier la variation des constantes de
+Bateman-Horn C_k et de la pente ρ_k = pente × C_k (Paper II, Table 2).
+
+### Convention canonique q_min
+
+Pour chaque premier p et chaque k :
+
+1. **ε** est fixé par `p mod 2k` — unique valeur qui rend q entier :
+   - `p ≡ 1 (mod 2k)` → ε = +1
+   - `p ≡ 2k−1 (mod 2k)` → ε = −1
+   - sinon → p n'appartient pas à la k-famille
+
+2. Poser `N = (p − ε) / k` *(entier exact, toujours pair)*
+
+3. Calculer `m_low = ⌊(−1 + √(1+4N)) / 2⌋`  
+   → le plus grand m tel que m·(m+1) ≤ N
+
+4. En déduire :
+   - `q_low  = (N − m_low·(m_low+1)) / 2`  ≥ 0
+   - `q_high = q_low − (m_low + 1)`         < 0
+
+5. **Choix canonique** :
+   - `|q_high| < |q_low|` → m = m_low+1, q = q_high *(q négatif)*
+   - `|q_high| ≥ |q_low|` → m = m_low,   q = q_low  *(q positif ; priorité en cas d'égalité)*
+
+**Borne inconditionnelle :** `|q| ≤ m`  *(Proposition 2.3, Paper I)*
+
+### Structure de couche
+
+La couche m pour le paramètre k est l'ensemble de tous les premiers p
+canoniquement assignés à ce m. Elle contient au plus 2(m+1) candidats
+de la forme `H_m ± 1 + 2k·j` pour j = 0, …, m.
+
+Espérance théorique du cardinal de la couche m (Dirichlet / Bateman-Horn) :
+
+```
+n̂_m = 4k(m+1) / (φ(2k) · log(k·m·(m+1)))
+```
+
+### Fonctionnelles cumulatives
+
+Les trois cumulatifs sont calculés dans l'ordre croissant de p au sein
+de chaque k-famille :
+
+| Symbole | Formule | Rôle |
+|---------|---------|------|
+| Q_r | Σᵢ₌₁ʳ qᵢ | Somme des décalages signés |
+| X_r | Σᵢ₌₁ʳ (qᵢ + εᵢ) = Σcᵢ | Fonctionnelle Q du papier ; décomposition Q ≈ α√p + β·D |
+| D_r | Σᵢ₌₁ʳ ({√(pᵢ′/k)} − ½) | Terme de Weyl, équidistribution de √(p/k) mod 1 |
+
+*{x} = partie fractionnaire de x, pᵢ′ = pᵢ − εᵢ.*
+
+Le Théorème 5.1 (Paper III) établit que `X_r ≈ α·√p_r + β·D_r + γ`
+avec R² ≥ 0.967 et corrélation r(X_r, D_r) ≥ 0.84.
+
+---
+
 **Formule centrale :**  `p = k·m(m+1) + ε + 2k·q`
 
 | Champ       | Valeur                          |

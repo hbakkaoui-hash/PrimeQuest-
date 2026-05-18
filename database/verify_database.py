@@ -1,17 +1,55 @@
 #!/usr/bin/env python3
 # =============================================================================
-# verify_database.py — Vérification indépendante de la base de données
+# Auteur   : Hassane BAKKAOUI — Chercheur indépendant
+# Contact  : bakkahassa@hotmail.com
+# Dépôt    : https://github.com/hbakkaoui-hash/PrimeQuest-
+# Licence  : MIT License — voir LICENSE dans le dépôt
+# Date     : Mai 2026
+# Version  : 1.0.0
 #
-# Recalcule depuis zéro les 5 premiers et 5 derniers enregistrements de
-# chaque k-famille et compare avec les valeurs stockées dans Parquet.
-#
-# Usage :
-#     python verify_database.py              # vérifie la base dans prime_database/
-#     python verify_database.py --db /path/  # répertoire alternatif
+# Références :
+#   Paper I  — Distribution du décalage minimal q_min
+#   Paper III— Décomposition Q ≈ α√p + β·D et terme de Weyl
 # =============================================================================
 """
-Vérificateur indépendant — recalcule intégralement les colonnes pour un
-sous-ensemble de premiers et compare avec la base générée.
+verify_database.py
+==================
+Vérificateur indépendant de la base de données paramétriques.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+OBJECTIF
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Ce script recalcule INTÉGRALEMENT, depuis zéro et sans référence au code
+de generate_database.py, les colonnes suivantes pour les 5 premiers et les
+5 derniers enregistrements de chaque k-famille :
+
+  Groupe A : p, k, m, eps, q, q_min, H_m
+             → convention canonique q_min = argmin |q| ; signe positif en cas
+               d'égalité (priorité m_low, accord Paper I §2.3)
+
+  Groupe D : q_mod_l  pour l ∈ {2, 3, 5, 7, 11, 13}
+
+  Groupe E : ln_p, sqrt_p, ln_m
+
+  Rangs    : r  (vérifiés pour les 5 premiers : r = 1, 2, 3, 4, 5)
+
+  Cumulatifs (cohérence) : Q_r croissant / décroissant selon le signe
+             majoritaire de q dans la queue
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+VÉRIFICATIONS GLOBALES (mode --global)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Parcourt tous les fichiers Parquet et vérifie sur chaque batch :
+  1. Reconstruction exacte  : p = H_m + ε + 2k·q
+  2. Borne inconditionnelle : |q| ≤ m  (Proposition 2.3, Paper I)
+  3. Continuité des rangs   : r commence à last_r + 1 pour chaque fichier
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+USAGE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    python verify_database.py                    # 5 premiers + 5 derniers / k
+    python verify_database.py --global           # vérification complète
+    python verify_database.py --db /path/to/db   # répertoire alternatif
 
 Chaque test utilise uniquement :
   – la définition p = k·m(m+1) + ε + 2k·q

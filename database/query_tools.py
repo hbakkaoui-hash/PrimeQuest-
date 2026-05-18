@@ -1,20 +1,77 @@
 #!/usr/bin/env python3
 # =============================================================================
-# query_tools.py — Fonctions de requête pour la base de données paramétrique
+# Auteur   : Hassane BAKKAOUI — Chercheur indépendant
+# Contact  : bakkahassa@hotmail.com
+# Dépôt    : https://github.com/hbakkaoui-hash/PrimeQuest-
+# Licence  : MIT License — voir LICENSE dans le dépôt
+# Date     : Mai 2026
+# Version  : 1.0.0
 #
-# Formule : p = k·m(m+1) + ε + 2k·q
+# Références :
+#   Paper I  — Distribution du décalage minimal q_min
+#   Paper II — Densités de Bateman-Horn pour k ∈ {3,15,21,23}
+#   Paper III— Connexion GUE / zéros de Riemann, terme de Weyl D_r
 # =============================================================================
 """
-Fonctions utilitaires pour interroger la base Parquet générée par
-generate_database.py.
+query_tools.py
+==============
+Fonctions de requête analytique sur la base de données paramétriques.
 
-Fonctions exportées :
-  query_layer(m, k)              → DataFrame de tous les premiers de la couche m
-  compute_c(m_min, m_max, k)     → statistique χ² cumulée sur [m_min, m_max]
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+FORMULE DE RÉFÉRENCE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    p = k · m·(m+1) + ε + 2k · q
+    k ∈ {3, 15, 21, 23},  ε ∈ {+1, −1},  m ≥ 0,  q ∈ ℤ
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+FONCTIONS EXPORTÉES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+query_layer(m, k, db_dir, columns)
+    Retourne un DataFrame de TOUS les premiers canoniquement assignés à la
+    couche m pour le paramètre k, triés par p croissant.
+
+    La couche m contient les premiers p tels que :
+      • m = argmin_{m′ ∈ {m_low, m_low+1}} |q(m′)|
+      • où m_low = ⌊(−1 + √(1+4N)) / 2⌋  avec N = (p−ε)/k
+    Borne garantie : q ∈ [−m, m]  (Proposition 2.3, Paper I).
+
+compute_c(m_min, m_max, k, db_dir)
+    Calcule la statistique de chi-deux normalisée sur la plage de couches
+    [m_min, m_max] pour le paramètre k :
+
+        c(m_min, m_max) = (1 / L) · Σ_{m=m_min}^{m_max} T_m²
+
+    où L = m_max − m_min + 1 et T_m = (n_m − n̂_m) / √n̂_m.
+
+    Interprétation :
+      c ≈ 1  → distribution de Poisson (indépendance entre couches)
+      c >> 1 → surdispersion (corrélations entre premiers de couches voisines)
+      c << 1 → sous-dispersion (répulsion, signature GUE possible)
+
+    Référence : connexion GUE via Paper III, Section 6.
+
+layer_stats(m, k)
+    Statistiques descriptives d'une couche : n_m, nm_hat, T_m,
+    sum_q, mean_q, std_q, min_q, max_q, Q_r_last.
+
+c_scan(k, m_step)
+    Balayage de c(m, m+m_step) sur toutes les couches → DataFrame [m_min, c].
+    Utile pour visualiser l'évolution de la dispersion par tranches.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+USAGE RAPIDE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    from query_tools import query_layer, compute_c
+
+    df = query_layer(m=1000, k=3)
+    print(df[["p", "eps", "q", "Q_r", "D_r"]])
+
+    c_val, detail = compute_c(m_min=100, m_max=5000, k=3)
+    print(f"c = {c_val:.4f}  (≈1 si Poisson)")
 
 Toutes les fonctions lisent directement les fichiers Parquet partitionnés
-et ne nécessitent pas que SQLite soit ouvert.
-"""
+(FINAL_DIR/k={k}/) sans nécessiter que SQLite soit ouvert."""
 
 from __future__ import annotations
 

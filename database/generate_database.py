@@ -1,26 +1,169 @@
 #!/usr/bin/env python3
 # =============================================================================
-# generate_database.py — Base de données unifiée de la famille paramétrique
+# Auteur   : Hassane BAKKAOUI — Chercheur indépendant
+# Contact  : bakkahassa@hotmail.com
+# Dépôt    : https://github.com/hbakkaoui-hash/PrimeQuest-
+# Licence  : MIT License — voir LICENSE dans le dépôt
+# Date     : Mai 2026
+# Version  : 1.0.0
 #
-# Formule : p = k·m(m+1) + ε + 2k·q
-# k ∈ {3, 15, 21, 23},  ε ∈ {+1, −1},  m ≥ 0,  q ∈ ℤ
-#
-# Auteur   : H. Bakkaoui (2026)
-# Articles : Papers I, II, III, IV + programme GUE / zéros de Riemann
-# Licence  : MIT
+# Références (Papers I–IV) :
+#   Paper I  — "Une famille paramétrique de nombres premiers : distribution
+#               heuristique du décalage minimal et validation numérique"
+#   Paper II — "Familles paramétriques et progressions arithmétiques :
+#               densités de Bateman-Horn pour k ∈ {3,15,21,23}"
+#   Paper III— "Connexion GUE / zéros de Riemann via la décomposition
+#               Q(p_N) ≈ α√p + β·D_N et le terme de Weyl fractionnaire"
+#   Paper IV — "Certificats de primalité de Pocklington pour la famille
+#               p = k·m(m+1) + ε + 2k·q jusqu'à 50 000 chiffres"
+#   arXiv    : math.NT [à compléter après soumission]
 # =============================================================================
 """
-Génère la base de données unifiée en trois phases :
+generate_database.py
+====================
+Générateur de la base de données unifiée de la famille paramétrique de premiers.
 
-  Phase 1 – Crible segmenté → Parquet brut par k (colonnes Groupes A, D, E)
-  Phase 2 – Enrichissement  → comptages couche, cumulatifs (Groupes B, C, E)
-  Phase 3 – Export SQLite   → tables layers, modular_stats, primes_parametric_sample
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+FORMULE CENTRALE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-Usage :
-    python generate_database.py              # N_MAX = 10^12 (défaut)
-    python generate_database.py --n 1e9      # limite personnalisée
-    python generate_database.py --resume     # reprise depuis checkpoint
-    python generate_database.py --quick      # N=10^6 pour test rapide
+    p = k · m·(m+1) + ε + 2k · q
+
+où :
+  p  — nombre premier étudié
+  k  — paramètre de famille ∈ {3, 15, 21, 23}
+       • k=3  : 2k=6,  φ(6)=2  → couvre TOUS les premiers > 3 (p ≡ ±1 mod 6)
+       • k=15 : 2k=30, φ(30)=8 → premiers ≡ ±1 (mod 30)
+       • k=21 : 2k=42, φ(42)=12→ premiers ≡ ±1 (mod 42)
+       • k=23 : 2k=46, φ(46)=22→ premiers ≡ ±1 (mod 46)
+  ε  — signe ∈ {+1, −1}, déterminé uniquement par p mod 2k
+       • p ≡ 1  (mod 2k) → ε = +1
+       • p ≡ −1 (mod 2k) → ε = −1
+       • autrement         → p n'appartient pas à la k-famille
+  m  — indice de couche (entier ≥ 0), choisi canoniquement (voir ci-dessous)
+  q  — décalage signé (entier ∈ ℤ), = q_min par construction canonique
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+CONVENTION CANONIQUE POUR (m, q) = q_min
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Pour un premier p et un paramètre k donnés :
+
+  1.  ε est fixé par p mod 2k (unique valeur qui rend q entier).
+
+  2.  Poser N = (p − ε) / k  [entier exact, toujours pair].
+      Relation : N = m·(m+1) + 2q
+
+  3.  Calculer m_low = ⌊(−1 + √(1 + 4N)) / 2⌋
+      → le plus grand m tel que m·(m+1) ≤ N.
+
+  4.  En déduire :
+        q_low  = (N − m_low·(m_low+1)) / 2  ≥ 0
+        q_high = q_low − (m_low + 1)          < 0
+      [q_high correspond au choix m_high = m_low + 1]
+
+  5.  Choix canonique minimisant |q| :
+        |q_high| < |q_low|  →  m = m_low+1,  q = q_high  (q négatif)
+        |q_high| ≥ |q_low|  →  m = m_low,    q = q_low   (q positif ; priorité
+                                                            en cas d'égalité)
+
+  →  q_min ≡ q  (même valeur, même convention dans tous les articles)
+  →  Borne inconditionnelle : |q| ≤ m  (Proposition 2.3, Paper I)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+PARAMÈTRES CALCULÉS — 23 COLONNES PAR LIGNE (une ligne par premier par k)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+GROUPE A — Paramètres fondamentaux de la formule
+  p      (int64)  Le nombre premier.
+  k      (int64)  Paramètre de famille ∈ {3, 15, 21, 23}.
+  m      (int64)  Indice de couche canonique (voir convention ci-dessus).
+  eps    (int64)  Signe ε ∈ {+1, −1}.
+  q      (int64)  Décalage signé = q_min (convention canonique).
+  q_min  (int64)  Identique à q (rappel explicite pour les articles).
+  H_m    (int64)  Base hexagonale généralisée = k·m·(m+1).
+                  Interprétation : "centre" de la couche m.
+                  Vérification : p = H_m + ε + 2k·q  (exacte).
+
+GROUPE B — Structure de couche
+  r      (int64)  Rang de p dans la k-famille, ordre croissant de p, 1-indexé.
+  n_m    (int64)  Nombre de premiers dans la couche m pour ce k
+                  (cardinal de {p ∈ k-famille : couche canonique = m}).
+
+GROUPE C — Fonctionnelles cumulatives (ordre croissant de p dans la k-famille)
+  Q_r    (float64) Q_r = Σᵢ₌₁ʳ qᵢ
+                   Somme cumulative des décalages signés.
+                   Loi des grands nombres : Q_r / r → 0 (centrage asymptotique).
+
+  X_r    (float64) X_r = Σᵢ₌₁ʳ (qᵢ + εᵢ) = Σᵢ₌₁ʳ cᵢ
+                   Fonctionnelle Q du papier (notation Paper III).
+                   Décomposition : Q_r ≈ α·√p_r + β·D_r  (Théorème 5.1).
+
+  D_r    (float64) D_r = Σᵢ₌₁ʳ ({ √(pᵢ′/k) } − 1/2)  avec pᵢ′ = pᵢ − εᵢ
+                   Terme de Weyl / équidistribution.
+                   { x } = partie fractionnaire de x.
+                   Teste si √(p/k) mod 1 est équidistribué dans [0,1)
+                   (loi de Weyl pour les polynômes, Paper III Prop. 5).
+                   Corrélation r(X_r, D_r) ≥ 0.84 (Table 6, Paper III).
+
+GROUPE D — Distribution modulaire
+  q_mod_2  (int64)  q mod 2  — parité du décalage
+  q_mod_3  (int64)  q mod 3
+  q_mod_5  (int64)  q mod 5
+  q_mod_7  (int64)  q mod 7
+  q_mod_11 (int64)  q mod 11
+  q_mod_13 (int64)  q mod 13
+  → Test d'équidistribution de q dans les classes résiduelles (Paper II §4).
+
+GROUPE E — Grandeurs analytiques par couche
+  ln_p    (float64) log(p)  — logarithme naturel.
+  sqrt_p  (float64) √p.
+  ln_m    (float64) log(m) si m > 0, sinon 0.
+                    Loi logarithmique : E[|q_min|(m)] ≈ ρ_k · log(m)
+                    avec ρ_k = pente × C_k (Observation 5.1, Paper I).
+  nm_hat  (float64) Espérance théorique du nombre de premiers dans la couche m :
+                      n̂_m = 4k(m+1) / (φ(2k) · log(k·m·(m+1)))
+                    Dérivée de la densité de Dirichlet dans la progression
+                    ≡ ±1 (mod 2k) sur l'intervalle [H_m − 1, H_{m+1} − 1].
+  T_m     (float64) Statistique de Poisson normalisée :
+                      T_m = (n_m − n̂_m) / √n̂_m
+                    Sous H₀ (indépendance) : T_m ∼ N(0,1).
+                    Surdispersion si T_m >> 1 sur plusieurs couches.
+                    ⚠ La dernière couche (m_max) est tronquée → T_m non fiable.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+VALIDATIONS INTÉGRÉES (par chunk, loggées dans generation.log)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  1. Reconstruction exacte   : p = H_m + ε + 2k·q  pour chaque ligne
+  2. Borne inconditionnelle  : |q| ≤ m  (Prop. 2.3, Paper I)
+  3. Annulation arithmétique : 2k·|Σq| / Σp < 5 %
+     → reflète p ≈ H_m pour grands m ; précision croissante avec N
+     → 99.9964 % à N = 10^4 (Table 8, Paper III)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ARCHITECTURE TECHNIQUE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Phase 1 — Crible segmenté numpy (segments 2^23 ≈ 8 Mo)
+            → Parquet Snappy brut par k (colonnes Groupes A, D, E partiels)
+            → multiprocessing.Pool (4 workers, un par k) sur compute_params
+            → checkpoint automatique toutes les 10^8 nombres (--resume)
+
+  Phase 2 — Enrichissement en streaming (500 k lignes/batch)
+            → comptage n_m par couche (passe rapide sur raw Parquet)
+            → cumulatifs Q_r, X_r, D_r avec état courant inter-batches
+            → Parquet final partitionné : FINAL_DIR/k={k}/part_XXXXXX.parquet
+
+  Phase 3 — Export CSV gzip (10^5 lignes/fichier) + SQLite léger
+            → tables : primes_parametric_sample, layers, modular_stats
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+USAGE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    python generate_database.py                      # N = 10^12 (défaut)
+    python generate_database.py --n 1e9              # borne personnalisée
+    python generate_database.py --n 1e9 --workers 4  # 4 workers parallèles
+    python generate_database.py --resume             # reprise checkpoint
+    python generate_database.py --quick              # N = 10^6, test rapide
 
 Dépendances : numpy, pandas, pyarrow, tqdm
 """
