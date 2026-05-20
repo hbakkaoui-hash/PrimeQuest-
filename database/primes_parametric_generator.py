@@ -447,10 +447,11 @@ def main() -> None:
     n_parts    = len(sorted(OUTPUT_DIR.glob("m_block=*")))
 
     print(f"\n  Lignes générées : {total_rows:,} / {N_TARGET:,}")
+    m_max_expected = int(math.sqrt(p_max / K))
     print(f"  p_max atteint   : {p_max:,}  (attendu ≈ 2.04×10^9)")
-    print(f"  m_max           : {m_max}  (attendu ≈ 8 200)")
+    print(f"  m_max           : {m_max}  (attendu ≈ {m_max_expected:,}  = √(p_max/k))")
     if sum_q_first100 is not None:
-        print(f"  Σ q_min [1..100]: {sum_q_first100}  (attendu ≈ 2)")
+        print(f"  Σ q_min [1..100]: {sum_q_first100}")
     print(f"  Partitions      : {n_parts}  (m_block)")
     print(f"  Taille Parquet  : {total_size / 1024**3:.2f} Go")
     print(f"  Durée totale    : {elapsed:.1f}s  ({elapsed/60:.1f} min)")
